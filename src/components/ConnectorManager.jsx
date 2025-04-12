@@ -20,7 +20,23 @@ import {
   DialogContent,
   DialogActions,
   FormHelperText,
+  Card,
+  CardContent,
+  CardActions,
+  Stack,
+  Tooltip,
+  alpha,
 } from '@mui/material';
+import {
+  Add as AddIcon,
+  Refresh as RefreshIcon,
+  CloudSync as CloudSyncIcon,
+  Stop as StopIcon,
+  Delete as DeleteIcon,
+  Storage as StorageIcon,
+  Cable as CableIcon,
+  Api as ApiIcon
+} from '@mui/icons-material';
 import {
   setupConnector,
   stopConnector,
@@ -31,6 +47,7 @@ import {
 const ConnectorManager = () => {
   const [connectors, setConnectors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [machines, setMachines] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -85,6 +102,18 @@ const ConnectorManager = () => {
     fetchData();
   }, []);
   
+  const refreshConnectors = async () => {
+    setRefreshing(true);
+    try {
+      const updatedConnectors = await listConnectors();
+      setConnectors(updatedConnectors);
+    } catch (error) {
+      setError('Failed to refresh connectors: ' + error.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const handleOpenDialog = () => {
     setOpenDialog(true);
   };
@@ -211,49 +240,143 @@ const ConnectorManager = () => {
       default: return type;
     }
   };
+
+  // Get connector icon based on type
+  const getConnectorIcon = (type) => {
+    switch (type) {
+      case 'CSVFileConnector': return <StorageIcon />;
+      case 'APIConnector': return <ApiIcon />;
+      case 'ModbusConnector': return <CableIcon />;
+      case 'OPCUAConnector': return <CloudSyncIcon />;
+      default: return <StorageIcon />;
+    }
+  };
+
+  // Get status color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'running': return 'success';
+      case 'failed': return 'error';
+      case 'stopped': return 'warning';
+      default: return 'info';
+    }
+  };
   
   return (
-    <Paper sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Data Connectors</Typography>
-        <Button 
-          variant="contained" 
-          onClick={handleOpenDialog}
-          disabled={loading}
-        >
-          Add Connector
-        </Button>
+    <Paper sx={{ p: 3, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h5" fontWeight="500">Data Connectors</Typography>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Tooltip title="Refresh connectors">
+            <IconButton 
+              onClick={refreshConnectors}
+              disabled={loading || refreshing}
+              sx={{ bgcolor: theme => alpha(theme.palette.primary.main, 0.1), '&:hover': { bgcolor: theme => alpha(theme.palette.primary.main, 0.2) } }}
+            >
+              {refreshing ? <CircularProgress size={24} /> : <RefreshIcon />}
+            </IconButton>
+          </Tooltip>
+          <Button 
+            variant="contained" 
+            onClick={handleOpenDialog}
+            disabled={loading}
+            startIcon={<AddIcon />}
+            sx={{ borderRadius: 2, textTransform: 'none' }}
+          >
+            Add Connector
+          </Button>
+        </Box>
       </Box>
       
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
       
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+      {loading && !refreshing ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <CircularProgress />
         </Box>
       ) : (
         <>
           {connectors.length === 0 ? (
-            <Box sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="body1" color="text.secondary">
-                No active data connectors. Click "Add Connector" to set up data streaming.
-              </Typography>
-            </Box>
+            <Card sx={{ 
+              p: 4, 
+              textAlign: 'center', 
+              bgcolor: 'background.default', 
+              borderRadius: 2,
+              border: '1px dashed',
+              borderColor: 'divider'
+            }}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                gap: 2,
+                py: 3
+              }}>
+                <CloudSyncIcon sx={{ fontSize: 60, color: 'text.disabled' }} />
+                <Typography variant="h6" color="text.secondary">
+                  No active data connectors
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 450, mb: 2 }}>
+                  Data connectors help stream real-time sensor data from your equipment to the predictive maintenance system.
+                </Typography>
+                <Button 
+                  variant="contained" 
+                  onClick={handleOpenDialog}
+                  startIcon={<AddIcon />}
+                  sx={{ borderRadius: 2, textTransform: 'none' }}
+                >
+                  Add Your First Connector
+                </Button>
+              </Box>
+            </Card>
           ) : (
             <Grid container spacing={2}>
-              {connectors.map((connector) => (
-                <Grid item xs={12} key={connector.equipment_id}>
-                  <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box>
-                        <Typography variant="subtitle1">
-                          {connector.equipment_id}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+              {connectors.map((connector) => {
+                const statusColor = getStatusColor(connector.status);
+                const machineName = machines.find(m => m.equipment_id === connector.equipment_id)?.name || connector.equipment_id;
+                
+                return (
+                  <Grid item xs={12} sm={6} md={4} key={connector.equipment_id}>
+                    <Card 
+                      elevation={0} 
+                      sx={{ 
+                        borderRadius: 2,
+                        transition: 'all 0.2s',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        '&:hover': {
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
+                    >
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                          <Box 
+                            sx={{ 
+                              p: 1.5, 
+                              borderRadius: 2, 
+                              mr: 2,
+                              bgcolor: theme => alpha(theme.palette.primary.main, 0.1)
+                            }}
+                          >
+                            {getConnectorIcon(connector.connector_type)}
+                          </Box>
+                          <Box sx={{ flexGrow: 1 }}>
+                            <Typography variant="subtitle1" fontWeight="500" noWrap>
+                              {machineName}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" noWrap>
+                              ID: {connector.equipment_id}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        
+                        <Stack direction="row" spacing={1} mt={2}>
                           <Chip 
                             label={getConnectorTypeName(connector.connector_type)} 
                             size="small" 
@@ -263,36 +386,64 @@ const ConnectorManager = () => {
                           <Chip 
                             label={connector.status} 
                             size="small" 
-                            color={connector.status === 'running' ? 'success' : 'error'} 
-                            variant="outlined"
+                            color={statusColor}
+                            sx={{
+                              fontWeight: 'medium',
+                              '& .MuiChip-label': { textTransform: 'capitalize' }
+                            }}
                           />
-                        </Box>
-                      </Box>
-                      <Button 
-                        variant="outlined" 
-                        color="error" 
-                        size="small"
-                        onClick={() => handleStopConnector(connector.equipment_id)}
-                      >
-                        Stop
-                      </Button>
-                    </Box>
-                  </Paper>
-                </Grid>
-              ))}
+                        </Stack>
+                      </CardContent>
+                      
+                      <CardActions sx={{ justifyContent: 'flex-end', p: 2, pt: 0 }}>
+                        <Button 
+                          variant="outlined" 
+                          color="error" 
+                          size="small"
+                          startIcon={<StopIcon />}
+                          onClick={() => handleStopConnector(connector.equipment_id)}
+                          sx={{ borderRadius: 1.5, textTransform: 'none' }}
+                        >
+                          Stop Connector
+                        </Button>
+                      </CardActions>
+                    </Card>
+                  </Grid>
+                );
+              })}
             </Grid>
           )}
         </>
       )}
       
       {/* Add Connector Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Data Connector</DialogTitle>
-        <DialogContent>
+      <Dialog 
+        open={openDialog} 
+        onClose={handleCloseDialog} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{ 
+          sx: { 
+            borderRadius: 3,
+            overflow: 'hidden'
+          } 
+        }}
+      >
+        <DialogTitle sx={{ 
+          bgcolor: 'background.default', 
+          px: 3, 
+          py: 2.5,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          fontWeight: 500
+        }}>
+          Add Data Connector
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
           <Box sx={{ pt: 1 }}>
-            <Grid container spacing={2}>
+            <Grid container spacing={3}>
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
+                <FormControl fullWidth variant="outlined">
                   <InputLabel>Connector Type</InputLabel>
                   <Select
                     name="connector_type"
@@ -309,7 +460,7 @@ const ConnectorManager = () => {
               </Grid>
               
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
+                <FormControl fullWidth variant="outlined">
                   <InputLabel>Equipment</InputLabel>
                   <Select
                     name="equipment_id"
@@ -328,7 +479,7 @@ const ConnectorManager = () => {
               
               <Grid item xs={12}>
                 <Divider sx={{ my: 1 }} />
-                <Typography variant="subtitle2" gutterBottom>
+                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 500, mt: 1 }}>
                   Connection Settings
                 </Typography>
               </Grid>
@@ -342,6 +493,7 @@ const ConnectorManager = () => {
                     type={field.type}
                     required={field.required}
                     fullWidth
+                    variant="outlined"
                     value={
                       field.paramType === 'config' 
                         ? formValues.config[field.name] || field.defaultValue || '' 
@@ -357,7 +509,7 @@ const ConnectorManager = () => {
                 <>
                   <Grid item xs={12}>
                     <Divider sx={{ my: 1 }} />
-                    <Typography variant="subtitle2" gutterBottom>
+                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 500, mt: 1 }}>
                       Authentication (Optional)
                     </Typography>
                   </Grid>
@@ -368,9 +520,9 @@ const ConnectorManager = () => {
                       label="Username"
                       type="text"
                       fullWidth
+                      variant="outlined"
                       value={formValues.config.auth_username || ''}
                       onChange={handleFormChange}
-                      variant="outlined"
                     />
                   </Grid>
                   
@@ -380,9 +532,9 @@ const ConnectorManager = () => {
                       label="Password"
                       type="password"
                       fullWidth
+                      variant="outlined"
                       value={formValues.config.auth_password || ''}
                       onChange={handleFormChange}
-                      variant="outlined"
                     />
                   </Grid>
                 </>
@@ -390,14 +542,29 @@ const ConnectorManager = () => {
             </Grid>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={loading}>
+        <DialogActions sx={{ 
+          px: 3, 
+          py: 2.5, 
+          borderTop: '1px solid',
+          borderColor: 'divider' 
+        }}>
+          <Button 
+            onClick={handleCloseDialog} 
+            disabled={loading}
+            sx={{ textTransform: 'none', fontWeight: 500 }}
+          >
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit} 
             variant="contained" 
             disabled={loading || !formValues.equipment_id}
+            sx={{ 
+              borderRadius: 1.5, 
+              textTransform: 'none',
+              px: 3,
+              fontWeight: 500
+            }}
           >
             {loading ? <CircularProgress size={24} /> : 'Set Up Connector'}
           </Button>
