@@ -1,0 +1,172 @@
+maintenance_id,equipment_id,maintenance_date,maintenance_type,technician,duration_hours,cost,parts_replaced,notes
+M001,HVAC001,2022-01-10,Preventive,John Smith,2,150,Filters,Routine inspection and filter replacement
+M002,PUMP003,2022-02-15,Corrective,Maria Garcia,4,500,Impeller,Replacement after leak
+M003,TURBINE004,2022-03-05,Preventive,David Wilson,6,800,Lubricant,Routine inspection
+M004,HVAC002,2022-03-12,Preventive,John Smith,3,300,Filters,Quarterly maintenance
+M005,MOTOR005,2022-04-18,Corrective,Robert Johnson,5,650,Bearing,Replacement after failure
+M006,HVAC001,2022-06-08,Preventive,Maria Garcia,2,200,Filters,Quarterly maintenance
+M007,EXCHANGER006,2022-06-25,Preventive,David Wilson,4,350,Gaskets,Routine inspection
+M008,TURBINE004,2022-07-15,Corrective,Robert Johnson,8,1200,Gearbox,Repair after leak detection
+M009,COMPRESSOR007,2022-08-20,Preventive,John Smith,1,180,Air filter,Replacement after failure
+M010,PUMP003,2022-09-05,Preventive,Maria Garcia,2,220,Seal,Replacement after leak
+M011,HVAC002,2022-10-12,Corrective,David Wilson,7,950,Compressor,Emergency replacement
+M012,GENERATOR008,2022-11-08,Preventive,Robert Johnson,3,400,Filters,Semi-annual inspection
+M013,BOILER009,2022-12-15,Preventive,John Smith,4,380,Water treatment chemicals,Quarterly inspection
+M014,TURBINE004,2023-01-10,Preventive,Maria Garcia,5,750,Lubricant,Major inspection
+M015,MOTOR005,2023-02-14,Preventive,David Wilson,2,280,Insulation,Routine inspection
+M016,HVAC010,2023-03-05,Corrective,Robert Johnson,3,420,Condensate pump,Replacement after failure
+M017,PUMP011,2023-03-22,Preventive,John Smith,1,190,Lubricant,Routine inspection
+M018,TURBINE012,2023-04-12,Preventive,Maria Garcia,6,820,Turbine blade,Routine inspection
+M019,MOTOR013,2023-05-08,Corrective,David Wilson,4,550,Control system,Software and hardware replacement
+M020,EXCHANGER014,2023-06-02,Preventive,Robert Johnson,3,300,Gaskets,Routine inspection
+M021,COMPRESSOR015,2023-06-28,Preventive,John Smith,2,240,Belt,Replacement after failure
+M022,TURBINE004,2023-07-15,Corrective,Maria Garcia,7,920,Turbine blade,Emergency repair after damage
+M023,BOILER017,2023-08-10,Preventive,David Wilson,3,380,Burner,Replacement after failure
+M024,HVAC018,2023-09-05,Corrective,Robert Johnson,4,520,Refrigerant,Leak repair and recharge
+M025,PUMP019,2023-09-25,Preventive,John Smith,2,290,Mechanical seal,Replacement after failure
+M026,TURBINE020,2023-10-15,Preventive,Maria Garcia,4,580,Control system,Replacement of failed components
+M027,MOTOR005,2023-11-12,Corrective,David Wilson,8,1100,Stator,Emergency rewinding
+M028,TURBINE004,2023-12-05,Preventive,Robert Johnson,6,780,Lubricant,Major inspection
+M029,HVAC001,2024-01-08,Preventive,John Smith,2,270,Filters,Quarterly maintenance
+M030,PUMP003,2024-02-15,Corrective,Maria Garcia,3,320,Pressure switch,Replacement after failure
+HVAC001,2021-01-15,Preventive,John Smith,2,350,Filters,Routine inspection and filter replacement
+HVAC001,2021-04-12,Preventive,Maria Garcia,2,350,Filters,Cleaned coils and replaced filters
+HVAC001,2021-07-18,Preventive,John Smith,2,350,Filters,Routine maintenance
+HVAC001,2021-10-20,Preventive,Maria Garcia,2,350,Filters,Routine maintenance
+HVAC001,2021-05-13,Corrective,Robert Johnson,5,1450,Motor,Emergency repair after failure
+HVAC001,2022-01-10,Preventive,John Smith,2,350,Filters,Routine inspection and filter replacement
+HVAC001,2022-03-19,Corrective,Robert Johnson,5,4200,Compressor,Emergency replacement
+HVAC002,2021-01-20,Preventive,Maria Garcia,2,350,Filters,Routine inspection and filter replacement
+HVAC002,2021-04-18,Preventive,John Smith,2,350,Filters,Cleaned coils and replaced filters
+HVAC002,2021-08-26,Corrective,Robert Johnson,1,1100,Control Board,Replacement after failure
+HVAC002,2021-10-15,Preventive,Maria Garcia,2,350,Filters,Routine inspection and filter replacement
+HVAC002,2022-01-18,Preventive,John Smith,2,350,Filters,Routine inspection and filter replacement
+HVAC002,2022-04-20,Preventive,Maria Garcia,2,350,Filters,Routine inspection and filter replacement
+HVAC002,2022-07-15,Preventive,John Smith,2,350,Filters,Routine inspection and filter replacement
+HVAC002,2022-10-06,Corrective,Robert Johnson,7,950,Fan Motor,Emergency replacement
+PUMP003,2021-01-25,Preventive,Sarah Wilson,3,280,Lubricant,Routine inspection and lubrication
+PUMP003,2021-06-11,Corrective,Michael Brown,2,750,Seals,Replacement after leak
+PUMP003,2021-07-22,Preventive,Sarah Wilson,2,280,Lubricant,Routine inspection and lubrication
+PUMP003,2022-01-20,Preventive,Sarah Wilson,2,280,Lubricant,Routine inspection and lubrication
+PUMP003,2022-04-23,Corrective,Michael Brown,4,1650,Impeller,Complete replacement
+PUMP003,2022-07-15,Preventive,Sarah Wilson,2,280,Lubricant,Routine inspection and lubrication
+PUMP003,2023-01-16,Corrective,Michael Brown,4,1100,Bearings,Replacement after failure
+TURBINE004,2021-03-10,Preventive,David Lee,8,1200,Lubricant,Major inspection and lubrication
+TURBINE004,2021-09-15,Preventive,David Lee,6,450,Filters,Routine maintenance and filter change
+TURBINE004,2021-11-29,Corrective,Jennifer Adams,14500,Blades,Emergency repair after damage
+TURBINE004,2022-03-18,Preventive,David Lee,8,1200,Lubricant,Major inspection and lubrication
+TURBINE004,2022-09-09,Corrective,Jennifer Adams,9800,Control System,Software and hardware replacement
+MOTOR005,2021-01-30,Preventive,Thomas Wilson,3,320,Lubricant,Routine lubrication
+MOTOR005,2021-07-23,Corrective,Emily Davis,3,3500,Windings,Emergency rewinding
+MOTOR005,2021-07-30,Preventive,Thomas Wilson,3,320,Lubricant,Routine lubrication
+MOTOR005,2022-01-25,Preventive,Thomas Wilson,3,320,Lubricant,Routine lubrication
+MOTOR005,2022-07-20,Preventive,Thomas Wilson,3,320,Lubricant,Routine lubrication
+MOTOR005,2022-12-11,Corrective,Emily Davis,6,2100,Bearings,Replacement after failure
+EXCHANGER006,2021-03-15,Preventive,Alex Martinez,4,750,Gaskets,Routine inspection and gasket replacement
+EXCHANGER006,2021-09-16,Corrective,Christopher Wang,4,3200,Tubes,Repair after leak detection
+EXCHANGER006,2021-09-30,Preventive,Alex Martinez,4,750,Gaskets,Routine inspection and gasket replacement
+EXCHANGER006,2022-03-25,Preventive,Alex Martinez,4,750,Gaskets,Routine inspection and gasket replacement
+EXCHANGER006,2022-07-31,Corrective,Christopher Wang,6,1500,None,Chemical cleaning for fouling
+EXCHANGER006,2022-10-05,Preventive,Alex Martinez,4,750,Gaskets,Routine inspection and gasket replacement
+COMPRESSOR007,2021-01-10,Preventive,Jessica Brown,5,850,Lubricant,Quarterly maintenance
+COMPRESSOR007,2021-04-06,Corrective,Ryan Thompson,4,4800,Valves,Emergency replacement
+COMPRESSOR007,2021-04-20,Preventive,Jessica Brown,5,850,Lubricant,Quarterly maintenance
+COMPRESSOR007,2021-07-15,Preventive,Jessica Brown,5,850,Lubricant,Quarterly maintenance
+COMPRESSOR007,2021-10-10,Preventive,Jessica Brown,5,850,Lubricant,Quarterly maintenance
+COMPRESSOR007,2022-01-12,Preventive,Jessica Brown,5,850,Lubricant,Quarterly maintenance
+COMPRESSOR007,2022-04-18,Preventive,Jessica Brown,5,850,Lubricant,Quarterly maintenance
+COMPRESSOR007,2022-08-13,Corrective,Ryan Thompson,10,3200,Bearings,Replacement after unusual vibration
+COMPRESSOR007,2022-10-20,Preventive,Jessica Brown,5,850,Lubricant,Quarterly maintenance
+COMPRESSOR007,2023-01-15,Preventive,Jessica Brown,5,850,Lubricant,Quarterly maintenance
+COMPRESSOR007,2023-02-02,Corrective,Ryan Thompson,2,2300,Seals,Emergency replacement
+GENERATOR008,2021-04-10,Preventive,Kevin Chen,6,1800,Filters,Semi-annual inspection
+GENERATOR008,2021-10-19,Corrective,Stephanie Roberts,17500,Rotor,Major repair after failure
+GENERATOR008,2021-10-25,Preventive,Kevin Chen,6,1800,Filters,Semi-annual inspection
+GENERATOR008,2022-05-06,Corrective,Stephanie Roberts,6800,Control System,Replacement of failed components
+GENERATOR008,2022-05-15,Preventive,Kevin Chen,6,1800,Filters,Semi-annual inspection
+GENERATOR008,2022-11-10,Preventive,Kevin Chen,6,1800,Filters,Semi-annual inspection
+BOILER009,2021-02-15,Preventive,Daniel White,8,1200,Water treatment chemicals,Quarterly inspection
+BOILER009,2021-05-10,Preventive,Daniel White,6,1200,Water treatment chemicals,Quarterly inspection
+BOILER009,2021-08-03,Corrective,Amanda Johnson,8500,Tubes,Emergency replacement
+BOILER009,2021-11-12,Preventive,Daniel White,8,1200,Water treatment chemicals,Quarterly inspection
+BOILER009,2022-02-18,Preventive,Daniel White,6,1200,Water treatment chemicals,Quarterly inspection
+BOILER009,2022-05-20,Preventive,Daniel White,6,1200,Water treatment chemicals,Quarterly inspection
+BOILER009,2022-08-15,Preventive,Daniel White,6,1200,Water treatment chemicals,Quarterly inspection
+BOILER009,2022-11-21,Corrective,Amanda Johnson,4900,Burner,Replacement after failure
+HVAC010,2021-01-18,Preventive,Maria Garcia,2,350,Filters,Routine inspection and filter replacement
+HVAC010,2021-04-15,Preventive,John Smith,2,350,Filters,Cleaned coils and replaced filters
+HVAC010,2021-06-29,Corrective,Robert Johnson,8,2400,Refrigerant,Leak repair and recharge
+HVAC010,2021-07-20,Preventive,Maria Garcia,2,350,Filters,Routine inspection and filter replacement
+HVAC010,2021-10-18,Preventive,John Smith,2,350,Filters,Routine inspection and filter replacement
+HVAC010,2022-01-15,Preventive,Maria Garcia,2,350,Filters,Routine inspection and filter replacement
+HVAC010,2022-04-20,Preventive,John Smith,2,350,Filters,Routine inspection and filter replacement
+HVAC010,2022-08-16,Corrective,Robert Johnson,10,3800,Condenser,Replacement of corroded unit
+HVAC010,2022-10-15,Preventive,Maria Garcia,2,350,Filters,Routine inspection and filter replacement
+PUMP011,2021-01-20,Preventive,Sarah Wilson,3,280,Lubricant,Routine inspection and lubrication
+PUMP011,2021-05-11,Corrective,Michael Brown,4,1450,Mechanical Seal,Emergency replacement
+PUMP011,2021-07-25,Preventive,Sarah Wilson,2,280,Lubricant,Routine inspection and lubrication
+PUMP011,2022-01-18,Preventive,Sarah Wilson,2,280,Lubricant,Routine inspection and lubrication
+PUMP011,2022-07-20,Preventive,Sarah Wilson,2,280,Lubricant,Routine inspection and lubrication
+PUMP011,2022-09-29,Corrective,Michael Brown,6,2100,Bearings,Replacement after failure detection
+TURBINE012,2021-03-15,Preventive,David Lee,8,1200,Lubricant,Major inspection and lubrication
+TURBINE012,2021-09-20,Preventive,David Lee,6,450,Filters,Routine maintenance and filter change
+TURBINE012,2021-12-06,Corrective,Jennifer Adams,10800,Control Valve,Emergency replacement
+TURBINE012,2022-03-20,Preventive,David Lee,8,1200,Lubricant,Major inspection and lubrication
+TURBINE012,2022-06-19,Corrective,Jennifer Adams,12500,Blades,Major repair for erosion damage
+TURBINE012,2022-09-25,Preventive,David Lee,6,450,Filters,Routine maintenance and filter change
+MOTOR013,2021-01-25,Preventive,Thomas Wilson,4,320,Lubricant,Routine lubrication
+MOTOR013,2021-03-26,Corrective,Emily Davis,6,2450,Bearings,Emergency replacement
+MOTOR013,2021-07-28,Preventive,Thomas Wilson,3,320,Lubricant,Routine lubrication
+MOTOR013,2022-01-22,Preventive,Thomas Wilson,3,320,Lubricant,Routine lubrication
+MOTOR013,2022-07-25,Preventive,Thomas Wilson,3,320,Lubricant,Routine lubrication
+MOTOR013,2022-10-13,Corrective,Emily Davis,8,4100,Windings,Rewinding after insulation failure
+EXCHANGER014,2021-03-10,Preventive,Alex Martinez,4,750,Gaskets,Routine inspection and gasket replacement
+EXCHANGER014,2021-07-09,Corrective,Christopher Wang,8,2100,Gaskets,Emergency gasket replacement
+EXCHANGER014,2021-09-25,Preventive,Alex Martinez,4,750,Gaskets,Routine inspection and gasket replacement
+EXCHANGER014,2022-04-16,Corrective,Christopher Wang,10,3650,Tubes,Tube repair due to erosion
+EXCHANGER014,2022-10-10,Preventive,Alex Martinez,4,750,Gaskets,Routine inspection and gasket replacement
+COMPRESSOR015,2021-01-15,Preventive,Jessica Brown,5,850,Lubricant,Quarterly maintenance
+COMPRESSOR015,2021-04-18,Preventive,Jessica Brown,4,450,Lubricant,Oil change and lubrication
+COMPRESSOR015,2021-07-20,Preventive,Jessica Brown,5,690,Filters,Routine maintenance
+COMPRESSOR015,2021-09-23,Corrective,Ryan Thompson,10,3850,Piston Rings,Emergency piston ring replacement
+COMPRESSOR015,2021-10-15,Preventive,Jessica Brown,4,460,Lubricant,Post-repair inspection and lubrication
+COMPRESSOR015,2022-01-18,Preventive,Jessica Brown,5,700,Lubricant,Oil change and lubrication
+COMPRESSOR015,2022-04-15,Preventive,Jessica Brown,4,470,Lubricant,Oil change and lubrication
+COMPRESSOR015,2022-07-06,Corrective,Ryan Thompson,12,4650,Rod Bearings,Bearing replacement after failure
+COMPRESSOR015,2022-10-18,Preventive,Jessica Brown,5,710,Lubricant,Routine maintenance
+GENERATOR016,2021-04-15,Preventive,Kevin Chen,6,1800,Filters,Routine inspection and filter replacement
+GENERATOR016,2021-10-20,Preventive,Kevin Chen,6,1800,Filters,Routine inspection and filter replacement
+GENERATOR016,2021-11-11,Corrective,Stephanie Roberts,10,20500,Stator Windings,Major rewinding after failure
+GENERATOR016,2022-04-18,Preventive,Kevin Chen,6,1800,Filters,Routine inspection and filter replacement
+GENERATOR016,2022-08-29,Corrective,Stephanie Roberts,12,7800,AVR,AVR module replacement after failure
+GENERATOR016,2022-10-22,Preventive,Kevin Chen,6,1800,Filters,Routine inspection and filter replacement
+BOILER017,2021-02-10,Preventive,Daniel White,8,1200,Water treatment chemicals,Quarterly inspection
+BOILER017,2021-05-15,Preventive,Daniel White,6,1200,Water treatment chemicals,Quarterly inspection
+BOILER017,2021-06-16,Corrective,Amanda Johnson,6500,Refractory,Repair of damaged sections
+BOILER017,2021-08-20,Preventive,Daniel White,6,1200,Water treatment chemicals,Quarterly inspection
+BOILER017,2021-11-15,Preventive,Daniel White,6,1200,Water treatment chemicals,Quarterly inspection
+BOILER017,2022-02-12,Preventive,Daniel White,6,1200,Water treatment chemicals,Quarterly inspection
+BOILER017,2022-05-18,Preventive,Daniel White,6,1200,Water treatment chemicals,Quarterly inspection
+BOILER017,2022-08-22,Preventive,Daniel White,6,1200,Water treatment chemicals,Quarterly inspection
+BOILER017,2022-10-29,Corrective,Amanda Johnson,4250,Feed Pump,Complete replacement
+HVAC018,2021-01-12,Preventive,John Smith,2,350,Filters,Routine inspection and filter replacement
+HVAC018,2021-04-19,Corrective,Robert Johnson,6,1950,Expansion Valve,Valve replacement after failure
+HVAC018,2021-04-25,Preventive,Maria Garcia,2,350,Filters,Routine inspection and filter replacement
+HVAC018,2021-07-18,Preventive,John Smith,2,350,Filters,Routine inspection and filter replacement
+HVAC018,2021-10-22,Preventive,Maria Garcia,2,350,Filters,Routine inspection and filter replacement
+HVAC018,2022-01-20,Preventive,John Smith,2,350,Filters,Routine inspection and filter replacement
+HVAC018,2022-04-15,Preventive,Maria Garcia,2,350,Filters,Routine inspection and filter replacement
+HVAC018,2022-07-22,Preventive,John Smith,2,350,Filters,Routine inspection and filter replacement
+HVAC018,2022-11-06,Corrective,Robert Johnson,10,4750,Compressor,Complete replacement after burnout
+PUMP019,2021-01-15,Preventive,Sarah Wilson,3,280,Lubricant,Routine inspection and lubrication
+PUMP019,2021-07-20,Preventive,Sarah Wilson,2,280,Lubricant,Routine inspection and lubrication
+PUMP019,2021-08-11,Corrective,Michael Brown,8,2450,Impeller,Replacement of worn impeller
+PUMP019,2022-01-15,Preventive,Sarah Wilson,2,280,Lubricant,Routine inspection and lubrication
+PUMP019,2022-05-23,Corrective,Michael Brown,6,1850,Coupling,Emergency replacement after failure
+PUMP019,2022-07-22,Preventive,Sarah Wilson,2,280,Lubricant,Routine inspection and lubrication
+TURBINE020,2021-03-12,Preventive,David Lee,8,1200,Lubricant,Major inspection and lubrication
+TURBINE020,2021-09-18,Preventive,David Lee,6,450,Filters,Routine maintenance and filter change
+TURBINE020,2021-10-09,Corrective,Jennifer Adams,9850,Governor,Replacement of failed components
+TURBINE020,2022-03-15,Preventive,David Lee,8,1200,Lubricant,Major inspection and lubrication
+TURBINE020,2022-07-16,Corrective,Jennifer Adams,15200,Blades,Major repair after blade path damage
+TURBINE020,2022-09-20,Preventive,David Lee,6,450,Filters,Routine maintenance and filter change 

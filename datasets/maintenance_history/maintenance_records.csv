@@ -1,0 +1,16 @@
+id,equipment_id,maintenance_date,completion_date,maintenance_type,description,technician,status,cost,findings,priority
+maint-001,PUMP001,2022-11-15,2022-11-15,preventive,Regular quarterly maintenance,Tech 3,completed,350,All systems functioning properly after service,medium
+maint-002,HVAC002,2022-11-22,2022-11-22,preventive,Regular quarterly maintenance,Tech 1,completed,420,Replaced air filters and cleaned coils,medium
+maint-003,MOTOR003,2022-12-05,2022-12-05,corrective,Emergency repair - unusual noise,Tech 2,completed,780,Replaced worn bearings,high
+maint-004,TURBINE004,2022-12-12,2022-12-14,corrective,Vibration issue investigation,Tech 4,completed,1250,Realigned shaft and replaced coupling,high
+maint-005,PUMP001,2023-01-10,2023-01-10,preventive,Annual inspection and service,Tech 1,completed,520,Replaced seals and lubricated bearings,medium
+maint-006,COMPRESSOR005,2023-01-17,2023-01-17,preventive,Regular quarterly maintenance,Tech 3,completed,380,System pressure optimized,low
+maint-007,HVAC002,2023-01-25,2023-01-26,corrective,Low cooling performance,Tech 2,completed,650,Recharged refrigerant and fixed minor leak,medium
+maint-008,MOTOR003,2023-02-08,2023-02-08,preventive,Regular quarterly maintenance,Tech 1,completed,410,All systems nominal,low
+maint-009,TURBINE004,2023-02-15,2023-02-15,predictive,Recommended based on vibration analysis,Tech 4,completed,890,Replaced worn components before failure,medium
+maint-010,COMPRESSOR005,2023-02-28,2023-02-28,corrective,Pressure regulation failure,Tech 2,completed,720,Replaced pressure regulator,high
+maint-011,PUMP001,2023-03-15,,predictive,Scheduled based on oil analysis,Tech 3,scheduled,450,,high
+maint-012,HVAC002,2023-03-22,,preventive,Quarterly maintenance,Tech 1,scheduled,400,,medium
+maint-013,MOTOR003,2023-04-10,,preventive,Quarterly maintenance,Tech 2,scheduled,430,,medium
+maint-014,TURBINE004,2023-04-24,,predictive,Recommended based on temperature trends,Tech 4,scheduled,850,,high
+maint-015,COMPRESSOR005,2023-05-05,,preventive,Quarterly maintenance,Tech 1,scheduled,390,,low 

@@ -1,0 +1,11 @@
+failure_id,equipment_id,failure_date,failure_type,component,downtime_hours,repair_cost,root_cause,detection_method,severity
+F001,PUMP001,2022-07-12,mechanical,Impeller,28,1850,Cavitation damage,Vibration analysis,high
+F002,HVAC002,2022-08-05,electrical,Control board,12,950,Power surge,System diagnostics,medium
+F003,MOTOR003,2022-09-18,mechanical,Bearings,36,2240,Insufficient lubrication,Vibration analysis,critical
+F004,COMPRESSOR005,2022-10-03,mechanical,Valve assembly,8,780,Normal wear and tear,Pressure drop detection,low
+F005,TURBINE004,2022-11-27,mechanical,Blade damage,48,3850,Foreign object debris,Visual inspection,critical
+F006,HVAC002,2022-12-15,fluid,Refrigerant leak,6,550,Seal degradation,Pressure testing,low
+F007,PUMP001,2023-01-30,electrical,Motor controller,18,1380,Moisture ingress,Current monitoring,medium
+F008,MOTOR003,2023-02-22,mechanical,Coupling,4,680,Misalignment,Vibration analysis,low
+F009,COMPRESSOR005,2023-03-10,fluid,Oil contamination,24,1620,Filter failure,Oil analysis,high
+F010,TURBINE004,2023-04-05,electrical,Sensor failure,2,420,Wiring fault,System diagnostics,low 

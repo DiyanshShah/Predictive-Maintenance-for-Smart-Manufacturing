@@ -1,0 +1,45 @@
+feature,importance
+num__equipment_age_days,0.2819289370242448
+num__temperature,0.09876691410737841
+num__vibration,0.07408523642562433
+num__current,0.06879890095682346
+num__voltage,0.06261944334019051
+num__pressure,0.05934517431367463
+num__flow,0.03766581145296253
+num__speed,0.030413030723670346
+num__humidity,0.024145186183794395
+num__power_factor,0.022984013874461785
+num__oil_temperature,0.021915027401631492
+num__oil_pressure,0.021300919906463604
+num__feed_water_temperature,0.011966013937489962
+num__flue_gas_temperature,0.010566896517210838
+num__temperature_cold_in,0.01053046372084938
+num__steam_flow,0.010064494011600155
+num__oxygen_content,0.010017655581151606
+num__temperature_hot_in,0.010011646749640333
+num__flow_hot,0.009877927093584819
+num__flow_cold,0.00972506463952778
+num__pressure_hot,0.009456204942363483
+num__temperature_cold_out,0.00935136273434746
+num__pressure_outlet,0.009271701502262551
+num__temperature_hot_out,0.009141059977833847
+num__water_level,0.00893226617054216
+num__pressure_cold,0.008206908588682317
+num__pressure_inlet,0.006706805261796427
+num__frequency,0.006624795399732138
+num__bearing_temperature,0.005963147017302172
+cat__equipment_type_Reciprocating Compressor,0.005640916074588081
+cat__equipment_type_Submersible Pump,0.005585180881542198
+cat__equipment_type_Centrifugal Pump,0.005485828116005423
+cat__equipment_type_Positive Displacement Pump,0.004878909383234075
+cat__equipment_type_Gas Turbine,0.0025851398627729934
+cat__equipment_type_Steam Turbine,0.002561429681678903
+cat__equipment_type_Plate Heat Exchanger,0.0025357271518576586
+cat__equipment_type_Electric Motor,0.0020769846498681142
+cat__equipment_type_Steam Boiler,0.0020159024325137613
+cat__equipment_type_Shell and Tube Heat Exchanger,0.0019295728163325667
+cat__equipment_type_HVAC,0.0013366790628069238
+cat__equipment_type_Screw Compressor,0.0008159956211889261
+cat__equipment_type_Hot Water Boiler,0.0007298972589911655
+cat__equipment_type_Natural Gas Generator,0.0007279146096451887
+cat__equipment_type_Diesel Generator,0.0007109128401361359

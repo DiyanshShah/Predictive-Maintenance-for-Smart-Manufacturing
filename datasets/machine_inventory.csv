@@ -1,0 +1,21 @@
+equipment_id,equipment_type,manufacturer,model,serial_number,installation_date,location,department,status,last_maintenance_date,next_maintenance_date,warranty_expiry,purchase_cost,expected_lifetime_years,operating_hours,criticality
+HVAC001,HVAC,Carrier,30RAP010,CAR78245639,2019-05-15,Building A,Administration,Operational,2023-01-15,2023-04-15,2024-05-15,45000,15,8760,Medium
+HVAC002,HVAC,Trane,RTAC185,TRN56891243,2018-08-22,Building B,Production,Operational,2022-10-15,2023-01-15,2023-08-22,52000,15,8760,High
+HVAC010,HVAC,Daikin,EWAD100,DAK34567812,2020-02-10,Building C,Warehouse,Operational,2022-10-15,2023-01-15,2025-02-10,38000,15,5840,Medium
+HVAC018,HVAC,York,YVAA0157,YRK98712354,2019-11-05,Building D,R&D,Operational,2022-12-05,2023-03-05,2024-11-05,41000,15,7300,Low
+PUMP003,Centrifugal Pump,Grundfos,CR 32-4,GRU45678932,2018-03-15,Pump Station 1,Utilities,Operational,2022-11-25,2023-02-25,2023-03-15,12500,20,14600,High
+PUMP011,Positive Displacement Pump,Flowserve,D824,FLS28934561,2020-05-10,Pump Station 2,Production,Operational,2022-10-15,2023-01-15,2025-05-10,15800,20,8760,Medium
+PUMP019,Submersible Pump,Xylem,3171,XYL67123489,2019-08-22,Water Treatment,Utilities,Operational,2022-07-22,2022-10-22,2024-08-22,9500,15,11680,Medium
+TURBINE004,Steam Turbine,Siemens,SST-400,SIE12345678,2016-11-10,Power Plant,Utilities,Operational,2022-08-10,2023-02-10,2026-11-10,850000,30,25550,Critical
+TURBINE012,Gas Turbine,General Electric,LM6000,GE789456123,2017-04-15,Power Plant,Utilities,Operational,2022-09-25,2023-03-25,2027-04-15,1250000,30,21900,Critical
+TURBINE020,Wind Turbine,Vestas,V90-3.0,VES34578912,2018-09-20,Wind Farm,Utilities,Operational,2022-09-20,2023-03-20,2028-09-20,2500000,25,12775,High
+MOTOR005,Electric Motor,ABB,M3BP,ABB56789123,2017-03-08,Production Line A,Production,Operational,2022-11-15,2023-02-15,2022-03-08,28500,15,19710,High
+MOTOR013,Electric Motor,Siemens,1LA7,SIE89123456,2019-06-15,Production Line B,Production,Operational,2022-11-15,2023-02-15,2024-06-15,32000,15,10950,Medium
+EXCHANGER006,Shell and Tube Heat Exchanger,Alfa Laval,M15,ALF23456789,2018-05-12,Utility Room,Utilities,Operational,2022-10-05,2023-02-05,2023-05-12,65000,20,14600,High
+EXCHANGER014,Plate Heat Exchanger,SWEP,B80,SWP78912345,2019-12-18,Process Area,Production,Operational,2022-10-10,2023-02-10,2024-12-18,45000,20,8760,Medium
+COMPRESSOR007,Reciprocating Compressor,Atlas Copco,LT20-30,ATL32167549,2017-08-15,Compressor Room,Utilities,Operational,2022-10-20,2023-01-20,2022-08-15,95000,20,17520,High
+COMPRESSOR015,Screw Compressor,Ingersoll Rand,R110i,IR654987321,2020-01-22,Process Area,Production,Operational,2022-10-18,2023-01-18,2025-01-22,78000,15,8760,Medium
+GENERATOR008,Diesel Generator,Caterpillar,C32,CAT56478932,2017-12-05,Emergency Power,Utilities,Operational,2022-11-10,2023-05-10,2022-12-05,350000,20,4380,Critical
+GENERATOR016,Natural Gas Generator,Cummins,QSV91G,CUM12398745,2019-03-15,Power Plant,Utilities,Operational,2022-10-22,2023-04-22,2024-03-15,420000,20,8760,Critical
+BOILER009,Steam Boiler,Cleaver-Brooks,CB,CLB67891234,2016-05-28,Boiler Room,Utilities,Operational,2022-11-15,2023-02-15,2021-05-28,285000,25,21900,Critical
+BOILER017,Hot Water Boiler,Viessmann,Vitoplex 200,VIE45678912,2019-09-10,Heating Plant,Utilities,Operational,2022-11-25,2023-02-25,2024-09-10,175000,20,8760,High 

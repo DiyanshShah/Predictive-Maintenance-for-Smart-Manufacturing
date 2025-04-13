@@ -1,0 +1,6 @@
+equipment_id,name,type,model,manufacturer,installation_date,location,operational_hours,power,weight,dimensions,temperature_threshold,vibration_threshold,pressure_threshold,oil_level_threshold
+PUMP001,Centrifugal Pump,Pump,CP-X3000,Industrial Equipment Inc.,2021-03-15,Building A Floor 1,8950,15kW,280kg,120cm x 80cm x 100cm,90,4.5,115,70
+HVAC002,HVAC System,HVAC,HC-2200,Climate Control Systems,2021-05-22,Building B Floor 2,8150,22kW,450kg,180cm x 120cm x 150cm,85,3.0,110,85
+MOTOR003,Electric Motor,Motor,EM-550X,PowerDrive Motors,2021-04-10,Building A Floor 2,8760,11kW,180kg,90cm x 70cm x 85cm,95,5.0,105,75
+TURBINE004,Turbine Generator,Turbine,TG-8000,TurboPower Solutions,2020-08-18,Building C Floor 1,12450,35kW,720kg,220cm x 150cm x 180cm,105,6.5,125,80
+COMPRESSOR005,Air Compressor,Compressor,AC-1500,Pressure Systems Inc.,2021-10-05,Building B Floor 1,6840,18kW,320kg,130cm x 90cm x 110cm,88,4.0,140,78 

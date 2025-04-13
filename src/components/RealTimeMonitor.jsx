@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Grid, 
   Paper, 
@@ -13,23 +13,15 @@ import {
   Chip,
   Button,
   Box,
-  Card,
-  CardContent,
-  CardHeader,
-  Divider,
-  Stack,
   Alert,
   LinearProgress
 } from '@mui/material';
-import { 
-  WarningAmber, 
-  CheckCircle, 
-  Error as ErrorIcon, 
-  AccessTime, 
-  Speed, 
-  Timeline 
-} from '@mui/icons-material';
-import { getMachines, getMachineReadings, runPrediction } from '../services/api';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import WarningAmber from '@mui/icons-material/WarningAmber';
+import ErrorIcon from '@mui/icons-material/Error';
+import AccessTime from '@mui/icons-material/AccessTime';
+import Timeline from '@mui/icons-material/Timeline';
+import { getMachines, getMachineReadings, runPrediction, scheduleMaintenance } from '../services/api';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 const RealTimeMonitor = () => {
@@ -40,50 +32,11 @@ const RealTimeMonitor = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [updateInterval, setUpdateInterval] = useState(30); // seconds
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [updateInterval] = useState(30); // seconds
+  const [autoRefresh] = useState(true); // removed setAutoRefresh since it's not used
 
-  // Fetch machines on component mount
-  useEffect(() => {
-    const fetchMachines = async () => {
-      try {
-        const data = await getMachines();
-        setMachines(data);
-        // Select the first machine by default
-        if (data.length > 0 && !selectedMachine) {
-          setSelectedMachine(data[0]);
-        }
-      } catch (err) {
-        setError('Failed to fetch equipment list: ' + err.message);
-      }
-    };
-
-    fetchMachines();
-  }, []);
-
-  // Fetch sensor data for selected machine
-  useEffect(() => {
-    if (selectedMachine) {
-      fetchSensorData();
-    }
-  }, [selectedMachine]);
-
-  // Auto-refresh data
-  useEffect(() => {
-    let interval;
-    
-    if (autoRefresh && selectedMachine) {
-      interval = setInterval(() => {
-        fetchSensorData();
-      }, updateInterval * 1000);
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoRefresh, updateInterval, selectedMachine]);
-
-  const fetchSensorData = async () => {
+  // Define fetchSensorData using useCallback before any useEffect that depends on it
+  const fetchSensorData = useCallback(async () => {
     if (!selectedMachine) return;
     
     setLoading(true);
@@ -112,34 +65,119 @@ const RealTimeMonitor = () => {
         };
         
         const predictionResult = await runPrediction(predictionInput);
+        console.log("Prediction result:", predictionResult); // Add logging to debug
         setPrediction(predictionResult);
       }
       
       setError(null);
     } catch (err) {
+      console.error("Error in fetchSensorData:", err); // Add detailed error logging
       setError('Failed to fetch sensor data: ' + err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedMachine]);
+
+  // Fetch machines on component mount
+  useEffect(() => {
+    const fetchMachines = async () => {
+      try {
+        const data = await getMachines();
+        setMachines(data);
+        // Select the first machine by default
+        if (data.length > 0 && !selectedMachine) {
+          setSelectedMachine(data[0]);
+        }
+      } catch (err) {
+        setError('Failed to fetch equipment list: ' + err.message);
+      }
+    };
+
+    fetchMachines();
+  }, [selectedMachine]);
+
+  // Fetch sensor data for selected machine
+  useEffect(() => {
+    if (selectedMachine) {
+      fetchSensorData();
+    }
+  }, [selectedMachine, fetchSensorData]);
+
+  // Auto-refresh data
+  useEffect(() => {
+    let interval;
+    
+    if (autoRefresh && selectedMachine) {
+      interval = setInterval(() => {
+        fetchSensorData();
+      }, updateInterval * 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [autoRefresh, updateInterval, selectedMachine, fetchSensorData]);
 
   const handleSelectMachine = (machine) => {
     setSelectedMachine(machine);
   };
+  
+  const handleScheduleMaintenance = (machine) => {
+    if (!machine) return;
+    
+    // Navigate to maintenance scheduler or open maintenance dialog
+    console.log('Schedule maintenance for:', machine.equipment_id);
+    alert(`Maintenance would be scheduled for ${machine.name}`);
+    
+    // You could also implement a call to scheduleMaintenance API here
+  };
 
   // Format date for display
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString();
+    if (!dateString) return 'Not available';
+    try {
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleString();
+    } catch (err) {
+      return 'Invalid date';
+    }
   };
 
-  // Format sensor data for chart
-  const chartData = sensorData.map(reading => ({
-    timestamp: new Date(reading.timestamp).toLocaleTimeString(),
-    temperature: reading.temperature,
-    vibration: reading.vibration,
-    pressure: reading.pressure,
-    oil_level: reading.oil_level
-  })).reverse();
+  // Format sensor data for chart with safety checks
+  const chartData = sensorData.map(reading => {
+    let timestamp;
+    try {
+      const date = new Date(reading.timestamp);
+      timestamp = isNaN(date.getTime()) ? 'Invalid time' : date.toLocaleTimeString();
+    } catch (err) {
+      timestamp = 'Invalid time';
+    }
+    
+    return {
+      timestamp,
+      temperature: reading.temperature,
+      vibration: reading.vibration,
+      pressure: reading.pressure,
+      oil_level: reading.oil_level
+    };
+  }).reverse();
+
+  // Helper function to safely access prediction values
+  const getPredictionValue = (path, defaultValue = 0) => {
+    if (!prediction) return defaultValue;
+    
+    const parts = path.split('.');
+    let value = prediction;
+    
+    for (const part of parts) {
+      if (value === null || value === undefined || typeof value !== 'object') {
+        return defaultValue;
+      }
+      value = value[part];
+    }
+    
+    return value === null || value === undefined ? defaultValue : value;
+  };
 
   return (
     <Grid container spacing={3}>
@@ -224,13 +262,21 @@ const RealTimeMonitor = () => {
                   <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
                     <Chip 
                       icon={<AccessTime />} 
-                      label={`Installed: ${new Date(selectedMachine.installation_date).toLocaleDateString()}`} 
+                      label={`Installed: ${selectedMachine.installation_date ? 
+                        (new Date(selectedMachine.installation_date).toString() !== 'Invalid Date' ? 
+                          new Date(selectedMachine.installation_date).toLocaleDateString() : 
+                          'Unknown date') : 
+                        'Unknown'}`} 
                       variant="outlined" 
                       size="small"
                     />
                     <Chip 
                       icon={<Timeline />} 
-                      label={`Last maintenance: ${new Date(selectedMachine.last_maintenance_date).toLocaleDateString()}`} 
+                      label={`Last maintenance: ${selectedMachine.last_maintenance_date ? 
+                        (new Date(selectedMachine.last_maintenance_date).toString() !== 'Invalid Date' ? 
+                          new Date(selectedMachine.last_maintenance_date).toLocaleDateString() : 
+                          'Unknown date') : 
+                        'Unknown'}`} 
                       variant="outlined" 
                       size="small"
                     />
@@ -347,40 +393,83 @@ const RealTimeMonitor = () => {
                       bgcolor: 'background.paper',
                       height: '100%'
                     }}>
-                      <Typography variant="subtitle1" gutterBottom>Analysis</Typography>
-                      <Typography variant="body1" gutterBottom>
-                        {typeof prediction.prediction === 'object' ? (
-                          <>
-                            <Typography variant="body2" paragraph>
-                              <strong>Failure Probability:</strong> {(prediction.prediction.failure_probability * 100).toFixed(2)}%
-                            </Typography>
-                            <Typography variant="body2" paragraph>
-                              <strong>Confidence:</strong> {(prediction.prediction.confidence * 100).toFixed(2)}%
-                            </Typography>
-                            {prediction.prediction.remaining_useful_life_days && (
-                              <Typography variant="body2" paragraph>
-                                <strong>Remaining Useful Life:</strong> {prediction.prediction.remaining_useful_life_days} days
-                              </Typography>
-                            )}
-                            {prediction.prediction.recommended_action && (
-                              <Typography variant="body2" paragraph>
-                                <strong>Recommended Action:</strong> {prediction.prediction.recommended_action}
-                              </Typography>
-                            )}
-                          </>
-                        ) : (
-                          prediction.prediction
-                        )}
+                      <Typography variant="h6" component="div" sx={{ mb: 2 }}>
+                        Analysis
                       </Typography>
-                      {prediction.maintenance_required && (
-                        <Alert severity="warning" sx={{ mt: 2 }}>
-                          <Typography variant="body1">
-                            Maintenance is recommended
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} md={6}>
+                          <Paper sx={{ p: 2, height: '100%' }}>
+                            <Typography variant="subtitle1" gutterBottom>
+                              Failure Probability
+                            </Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 2 }}>
+                              <CircularProgress
+                                variant="determinate"
+                                value={Math.min((prediction.failure_probability || 0) * 100, 100)}
+                                size={100}
+                                thickness={4}
+                                sx={{ color: (theme) => theme.palette.primary.main }}
+                              />
+                              <Typography variant="h4" component="div" sx={{ position: 'absolute' }}>
+                                {Math.round((prediction.failure_probability || 0) * 100)}%
+                              </Typography>
+                            </Box>
+                          </Paper>
+                        </Grid>
+                        
+                        <Grid item xs={12} md={6}>
+                          <Paper sx={{ p: 2, height: '100%' }}>
+                            <Typography variant="subtitle1" gutterBottom>
+                              Anomaly Detection
+                            </Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                              <Chip
+                                icon={prediction.anomaly_detected ? <WarningAmber /> : <CheckCircle />}
+                                label={prediction.anomaly_detected ? 'Anomaly Detected' : 'Normal Operation'}
+                                color={prediction.anomaly_detected ? 'error' : 'success'}
+                                sx={{ fontSize: '1rem', py: 2, px: 1 }}
+                              />
+                            </Box>
+                            {typeof prediction.anomaly_score === 'number' && (
+                              <Typography variant="body2" color="textSecondary" align="center">
+                                Anomaly Score: {Math.round(prediction.anomaly_score * 100)}%
+                              </Typography>
+                            )}
+                          </Paper>
+                        </Grid>
+                      </Grid>
+                      {prediction.recommended_action && (
+                        <Paper sx={{ p: 2, mt: 3 }}>
+                          <Typography variant="subtitle1" gutterBottom>
+                            Maintenance Recommendation
                           </Typography>
-                          <Typography variant="body2">
-                            Estimated time to failure: {prediction.estimated_time_to_failure} days
-                          </Typography>
-                        </Alert>
+                          <Alert 
+                            severity={
+                              prediction.failure_probability > 0.6 ? "error" : 
+                              prediction.failure_probability > 0.3 ? "warning" : "info"
+                            }
+                            sx={{ mb: 2 }}
+                          >
+                            {prediction.recommended_action === 'schedule_maintenance' 
+                              ? 'Immediate maintenance is recommended based on prediction analysis.' 
+                              : prediction.recommended_action === 'monitor'
+                              ? 'Increased monitoring is recommended. Schedule maintenance if condition worsens.'
+                              : 'Equipment is operating within normal parameters. Regular maintenance schedule can be followed.'}
+                          </Alert>
+                          
+                          {prediction.failure_probability > 0.3 && (
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                              <Button 
+                                variant="contained" 
+                                color="primary"
+                                onClick={() => handleScheduleMaintenance(selectedMachine)}
+                                disabled={!selectedMachine}
+                              >
+                                Schedule Maintenance
+                              </Button>
+                            </Box>
+                          )}
+                        </Paper>
                       )}
                     </Box>
                   </Grid>
@@ -400,12 +489,16 @@ const RealTimeMonitor = () => {
                               Failure Probability
                             </TableCell>
                             <TableCell align="right">
-                              {(prediction.probability * 100).toFixed(2)}%
+                              {typeof prediction.failure_probability === 'number' 
+                                ? (prediction.failure_probability * 100).toFixed(2) 
+                                : '0.00'}%
                             </TableCell>
                             <TableCell align="right">
-                              {prediction.probability < 0.3 ? (
+                              {typeof prediction.failure_probability !== 'number' ? (
+                                <AccessTime color="disabled" fontSize="small" />
+                              ) : prediction.failure_probability < 0.3 ? (
                                 <CheckCircle color="success" fontSize="small" />
-                              ) : prediction.probability < 0.7 ? (
+                              ) : prediction.failure_probability < 0.7 ? (
                                 <WarningAmber color="warning" fontSize="small" />
                               ) : (
                                 <ErrorIcon color="error" fontSize="small" />
@@ -432,10 +525,10 @@ const RealTimeMonitor = () => {
                               Maintenance Status
                             </TableCell>
                             <TableCell align="right">
-                              {prediction.maintenance_required ? 'Required' : 'Not Required'}
+                              {prediction.failure_probability > 0.5 ? 'Required' : 'Not Required'}
                             </TableCell>
                             <TableCell align="right">
-                              {prediction.maintenance_required ? (
+                              {prediction.failure_probability > 0.5 ? (
                                 <ErrorIcon color="error" fontSize="small" />
                               ) : (
                                 <CheckCircle color="success" fontSize="small" />

@@ -43,7 +43,15 @@ import {
   PriorityHigh as PriorityHighIcon,
   CalendarMonth as CalendarMonthIcon
 } from '@mui/icons-material';
-import { getMachines, getMachineDetails, scheduleMaintenance, runPrediction } from '../services/api';
+import { 
+  getMachines, 
+  getMachineDetails, 
+  scheduleMaintenance, 
+  runPrediction, 
+  getMaintenanceHistory,
+  getReliabilityScores,
+  getMaintenanceROI 
+} from '../services/api';
 
 const MaintenanceScheduler = () => {
   const [machines, setMachines] = useState([]);
@@ -56,6 +64,12 @@ const MaintenanceScheduler = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
+  const [maintenanceMetrics, setMaintenanceMetrics] = useState({
+    mtbf: null,
+    mttr: null,
+    availability: null,
+    maintenance_cost_ytd: null
+  });
   const [formData, setFormData] = useState({
     equipment_id: '',
     maintenance_date: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
@@ -110,6 +124,8 @@ const MaintenanceScheduler = () => {
   useEffect(() => {
     if (selectedEquipment) {
       fetchEquipmentDetails();
+      fetchMaintenanceHistory();
+      fetchMaintenanceMetrics();
     }
   }, [selectedEquipment]);
 
@@ -126,6 +142,8 @@ const MaintenanceScheduler = () => {
       // Get latest reading for prediction
       if (details.readings && details.readings.length > 0) {
         const latestReading = details.readings[0];
+        
+        // Include all available sensor data for better ML predictions
         const predictionInput = {
           timestamp: latestReading.timestamp,
           equipment_id: selectedEquipment.equipment_id,
@@ -133,63 +151,99 @@ const MaintenanceScheduler = () => {
             temperature: latestReading.temperature,
             vibration: latestReading.vibration,
             pressure: latestReading.pressure,
-            oil_level: latestReading.oil_level
+            oil_level: latestReading.oil_level,
+            // Add any additional sensor readings that might be available
+            ...(latestReading.voltage && { voltage: latestReading.voltage }),
+            ...(latestReading.current && { current: latestReading.current }),
+            ...(latestReading.rpm && { rpm: latestReading.rpm }),
+            ...(latestReading.humidity && { humidity: latestReading.humidity }),
+            ...(latestReading.flow_rate && { flow_rate: latestReading.flow_rate })
           }
         };
         
         // Run prediction
-        const prediction = await runPrediction(predictionInput);
-        setPredictionResults(prediction);
-        
-        // Pre-fill maintenance form with prediction-based data
-        if (prediction.maintenance_required) {
-          const maintenanceDate = new Date();
-          maintenanceDate.setDate(maintenanceDate.getDate() + 
-            Math.max(1, Math.floor(prediction.estimated_time_to_failure * 0.8)));
+        try {
+          const prediction = await runPrediction(predictionInput);
+          console.log("ML model prediction result:", prediction);
+          setPredictionResults(prediction);
           
-          setFormData(prev => ({
-            ...prev,
-            equipment_id: selectedEquipment.equipment_id,
-            maintenance_date: maintenanceDate,
-            maintenance_type: 'predictive',
-            description: `Predictive maintenance based on failure probability of ${(prediction.probability * 100).toFixed(1)}%`,
-            priority: prediction.probability > 0.7 ? 'critical' : 
-                     prediction.probability > 0.5 ? 'high' : 'medium'
-          }));
-        }
-      }
-      
-      // Setup maintenance schedule from history
-      if (details.maintenance_history) {
-        // Combine history and upcoming maintenance
-        const schedule = [
-          ...details.maintenance_history.map(item => ({
-            ...item,
-            status: 'completed'
-          })),
-          ...(details.upcoming_maintenance || []).map(item => ({
-            ...item,
-            status: 'scheduled'
-          }))
-        ];
-        
-        // Sort by date, with upcoming first
-        schedule.sort((a, b) => {
-          // Put completed at the bottom
-          if (a.status !== b.status) {
-            return a.status === 'completed' ? 1 : -1;
+          // Pre-fill maintenance form with prediction-based data
+          if (prediction.maintenance_required) {
+            const maintenanceDate = new Date();
+            // Use remaining_useful_life if available, otherwise fall back to estimated_time_to_failure
+            const daysToFailure = prediction.remaining_useful_life || prediction.estimated_time_to_failure;
+            
+            if (daysToFailure) {
+              maintenanceDate.setDate(maintenanceDate.getDate() + 
+                Math.max(1, Math.floor(daysToFailure * 0.8)));
+              
+              setFormData(prev => ({
+                ...prev,
+                equipment_id: selectedEquipment.equipment_id,
+                maintenance_date: maintenanceDate.toISOString().split('T')[0],
+                maintenance_type: 'predictive',
+                description: `Predictive maintenance based on ML prediction. Failure probability: ${(prediction.failure_probability * 100).toFixed(1)}%`,
+                priority: prediction.failure_probability > 0.7 ? 'critical' : 
+                         prediction.failure_probability > 0.5 ? 'high' : 'medium'
+              }));
+            }
           }
-          
-          // Then sort by date
-          return new Date(b.date || b.maintenance_date) - new Date(a.date || a.maintenance_date);
-        });
-        
-        setMaintenanceSchedule(schedule);
+        } catch (predError) {
+          console.error("Error running prediction:", predError);
+          setError(`Failed to run ML prediction: ${predError.message}`);
+        }
       }
       
       setLoading(false);
     } catch (err) {
-      setError('Failed to fetch equipment details: ' + err.message);
+      console.error('Failed to fetch equipment details:', err);
+      setError(`Failed to fetch equipment details: ${err.message}`);
+      setLoading(false);
+    }
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Not available';
+    try {
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString();
+    } catch (err) {
+      return 'Invalid date';
+    }
+  };
+
+  // Handle data format differences between API responses and mock data
+  const normalizeMaintenanceRecord = (record) => {
+    return {
+      id: record.id || `record-${Math.random().toString(36).substr(2, 9)}`,
+      equipment_id: record.equipment_id,
+      maintenance_date: record.maintenance_date || record.date,
+      maintenance_type: record.maintenance_type || record.type,
+      description: record.description,
+      technician: record.technician || 'Not assigned',
+      status: record.status || 'completed',
+      priority: record.priority || 'medium',
+      cost: record.cost
+    };
+  };
+
+  // Fetch maintenance history
+  const fetchMaintenanceHistory = async () => {
+    if (!selectedEquipment) return;
+    
+    setLoading(true);
+    try {
+      const history = await getMaintenanceHistory(selectedEquipment.equipment_id);
+      // Normalize the data format to handle different API responses
+      const normalizedHistory = Array.isArray(history) 
+        ? history.map(normalizeMaintenanceRecord)
+        : history.history ? history.history.map(normalizeMaintenanceRecord) : [];
+      
+      setMaintenanceSchedule(normalizedHistory);
+      setLoading(false);
+    } catch (err) {
+      setError('Failed to fetch maintenance history: ' + err.message);
       setLoading(false);
     }
   };
@@ -247,43 +301,31 @@ const MaintenanceScheduler = () => {
 
   // Submit maintenance schedule
   const handleSubmit = async () => {
-    // Validate form
-    if (!formData.equipment_id || !formData.maintenance_date || !formData.maintenance_type) {
-      setError('Please fill all required fields');
-      return;
-    }
-
     setLoading(true);
     try {
-      // Format date
-      const formattedData = {
-        ...formData,
-        maintenance_date: formData.maintenance_date.toISOString()
-      };
+      // Add the equipment_id if not present
+      if (!formData.equipment_id && selectedEquipment) {
+        formData.equipment_id = selectedEquipment.equipment_id;
+      }
       
-      // Schedule maintenance
-      const result = await scheduleMaintenance(formattedData);
+      // Validate data
+      if (!formData.equipment_id || !formData.maintenance_date || !formData.maintenance_type) {
+        throw new Error('Please fill all required fields');
+      }
       
-      // Show success message
-      setSuccess('Maintenance scheduled successfully');
-      setTimeout(() => setSuccess(null), 3000);
+      // Call API to schedule maintenance
+      const response = await scheduleMaintenance(formData);
+      
+      // Handle success
+      handleMaintenanceScheduled(response);
       
       // Close dialog
       handleCloseDialog();
-      
-      // Refresh equipment details to get updated schedule
-      fetchEquipmentDetails();
-      
-      setLoading(false);
     } catch (err) {
       setError('Failed to schedule maintenance: ' + err.message);
+    } finally {
       setLoading(false);
     }
-  };
-
-  // Format date
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString();
   };
 
   // Get priority color
@@ -310,6 +352,64 @@ const MaintenanceScheduler = () => {
     
     // Fallback to old format
     return predictionResults.maintenance_required || predictionResults.probability > 0.4;
+  };
+
+  // Handle successful maintenance scheduling
+  const handleMaintenanceScheduled = (newMaintenance) => {
+    // Add the new maintenance to the schedule
+    setMaintenanceSchedule(prev => [
+      {
+        ...newMaintenance,
+        status: 'scheduled'
+      }, 
+      ...prev
+    ]);
+    
+    setSuccess('Maintenance scheduled successfully');
+    setTimeout(() => setSuccess(null), 3000);
+    
+    // Refresh the maintenance history
+    fetchMaintenanceHistory();
+  };
+
+  // Add this new function to fetch maintenance metrics
+  const fetchMaintenanceMetrics = async () => {
+    try {
+      if (!selectedEquipment) return;
+      
+      console.log("Fetching maintenance metrics for:", selectedEquipment.equipment_id);
+      setLoading(true);
+      
+      // Get reliability scores for MTBF, MTTR, and availability - pass equipment ID
+      const reliabilityData = await getReliabilityScores(selectedEquipment.equipment_id);
+      console.log("Reliability data for equipment:", reliabilityData);
+      
+      // Get ROI data for maintenance costs - pass equipment ID
+      const roiData = await getMaintenanceROI('12months', selectedEquipment.equipment_id);
+      console.log("ROI data for equipment:", roiData);
+      
+      // Update metrics state with combined data
+      setMaintenanceMetrics({
+        mtbf: reliabilityData.mtbf,
+        mttr: reliabilityData.mttr,
+        availability: reliabilityData.availability,
+        maintenance_cost_ytd: roiData.total_cost || roiData.maintenance_cost_ytd || roiData.ytd_cost
+      });
+      
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching maintenance metrics:", err);
+      setError(`Failed to fetch maintenance metrics: ${err.message}`);
+      setLoading(false);
+      
+      // Initialize with null values to indicate data is not available
+      setMaintenanceMetrics({
+        mtbf: null,
+        mttr: null,
+        availability: null,
+        maintenance_cost_ytd: null
+      });
+    }
   };
 
   return (
@@ -536,7 +636,7 @@ const MaintenanceScheduler = () => {
                             .map((maintenance, index) => (
                               <TableRow key={index}>
                                 <TableCell>
-                                  {formatDate(maintenance.date || maintenance.maintenance_date)}
+                                  {formatDate(maintenance.maintenance_date)}
                                 </TableCell>
                                 <TableCell>
                                   <Chip 
@@ -598,7 +698,7 @@ const MaintenanceScheduler = () => {
                             .map((maintenance, index) => (
                               <TableRow key={index}>
                                 <TableCell>
-                                  {formatDate(maintenance.date || maintenance.maintenance_date)}
+                                  {formatDate(maintenance.maintenance_date)}
                                 </TableCell>
                                 <TableCell>
                                   <Chip 
@@ -639,7 +739,9 @@ const MaintenanceScheduler = () => {
                           MTBF
                         </Typography>
                         <Typography variant="h4">
-                          {equipmentDetails?.metrics?.mtbf || 'N/A'}
+                          {maintenanceMetrics.mtbf !== null ? 
+                            `${maintenanceMetrics.mtbf}h` : 
+                            'N/A'}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           Mean Time Between Failures
@@ -655,7 +757,9 @@ const MaintenanceScheduler = () => {
                           MTTR
                         </Typography>
                         <Typography variant="h4">
-                          {equipmentDetails?.metrics?.mttr || 'N/A'}
+                          {maintenanceMetrics.mttr !== null ? 
+                            `${maintenanceMetrics.mttr}h` : 
+                            'N/A'}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           Mean Time To Repair
@@ -671,9 +775,9 @@ const MaintenanceScheduler = () => {
                           Availability
                         </Typography>
                         <Typography variant="h4">
-                          {equipmentDetails?.metrics?.availability 
-                            ? `${equipmentDetails.metrics.availability}%` 
-                            : 'N/A'}
+                          {maintenanceMetrics.availability !== null ? 
+                            `${maintenanceMetrics.availability}%` : 
+                            'N/A'}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           Overall Equipment Availability
@@ -689,7 +793,9 @@ const MaintenanceScheduler = () => {
                           YTD Cost
                         </Typography>
                         <Typography variant="h4">
-                          ${equipmentDetails?.metrics?.maintenance_cost_ytd || 'N/A'}
+                          {maintenanceMetrics.maintenance_cost_ytd != null ? 
+                            `$${Number(maintenanceMetrics.maintenance_cost_ytd).toLocaleString()}` : 
+                            'N/A'}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           Year-to-date Maintenance Cost

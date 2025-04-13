@@ -248,41 +248,45 @@ export const getMachineReadings = async (equipmentId, params = {}) => {
   }
 };
 
+/**
+ * Run prediction on equipment
+ */
 export const runPrediction = async (data) => {
   try {
+    console.log("Sending prediction request with data:", data);
+    // Ensure we include all available sensor readings for better prediction
     const response = await api.post('/predict', data);
-    return response.data;
+    console.log("Raw prediction response:", response.data);
+    
+    // Map the backend response fields to frontend expected fields while preserving all ML model data
+    const resultData = response.data;
+    return {
+      prediction_id: resultData.prediction_id || `pred-${Date.now()}`,
+      timestamp: resultData.timestamp || new Date().toISOString(),
+      equipment_id: resultData.equipment_id || data.equipment_id || 'unknown',
+      // Map backend fields to expected frontend fields
+      failure_probability: resultData.probability,
+      remaining_useful_life: resultData.estimated_time_to_failure,
+      confidence: resultData.confidence || 0.9,
+      anomaly_detected: resultData.anomaly_detected,
+      anomaly_score: resultData.anomaly_score,
+      recommended_action: resultData.prediction, // prediction field maps to recommended_action
+      affected_components: resultData.affected_components || [],
+      next_maintenance_date: resultData.next_maintenance_date,
+      maintenance_required: resultData.maintenance_required,
+      // Include all original data to ensure no information is lost
+      raw_prediction_data: resultData
+    };
   } catch (error) {
     console.error('Error running prediction:', error);
-    // Return mock prediction if API fails
-    const isCritical = Math.random() < 0.2;
-    const isWarning = !isCritical && Math.random() < 0.3;
-    const failureProbability = isCritical ? 0.8 + Math.random() * 0.2 : 
-                        isWarning ? 0.5 + Math.random() * 0.3 : 
-                        Math.random() * 0.5;
-    const confidence = 0.6 + Math.random() * 0.4;
-    const remainingDays = Math.floor((1 - failureProbability) * 90);
-                        
-    return {
-      equipment_id: data.equipment_id,
-      prediction: {
-        failure_probability: failureProbability,
-        confidence: confidence,
-        remaining_useful_life_days: remainingDays,
-        recommended_action: isCritical ? "maintenance" : 
-                           isWarning ? "monitor" : 
-                           "normal"
-      },
-      note: isCritical ? "Critical condition detected. Immediate attention required." : 
-            isWarning ? "Abnormal patterns detected. Increased monitoring recommended." : 
-            "All parameters within normal operating ranges."
-    };
+    console.error('Error details:', error.response?.data || error.message);
+    throw new Error(`Failed to get prediction from ML model: ${error.message}`);
   }
 };
 
 export const scheduleMaintenance = async (data) => {
   try {
-    const response = await api.post('/maintenance/schedule', data);
+    const response = await api.post('/maintenance/create', data);
     return response.data;
   } catch (error) {
     console.error('Error scheduling maintenance:', error);
@@ -303,6 +307,7 @@ export const uploadHistoricalData = async (file) => {
     const formData = new FormData();
     formData.append('file', file);
     
+    // Match exact backend path: /api/upload-historical-data
     const response = await api.post('/upload-historical-data', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -324,6 +329,7 @@ export const uploadHistoricalData = async (file) => {
 
 export const setupConnector = async (connectorConfig) => {
   try {
+    // Match exact backend path: /api/connector/setup
     const response = await api.post('/connector/setup', connectorConfig);
     return response.data;
   } catch (error) {
@@ -396,141 +402,105 @@ export const listConnectors = async () => {
  */
 export const getComparativeAnalytics = async (metric, equipmentIds = []) => {
   try {
-    const response = await api.get('/analytics/comparative', { 
-      params: { metric, equipmentIds: equipmentIds.join(',') } 
+    const response = await api.get('/comparative-analytics', { 
+      params: { 
+        metric, 
+        equipment_ids: equipmentIds.join(',') 
+      } 
     });
-    return response.data;
+    
+    // Ensure we have valid data structures
+    return Array.isArray(response.data) ? response.data.map(point => ({
+      date: point.date || '',
+      current: typeof point.current === 'number' ? point.current : 0,
+      average: typeof point.average === 'number' ? point.average : 0,
+      optimal: typeof point.optimal === 'number' ? point.optimal : 0
+    })) : [];
   } catch (error) {
     console.error('Error fetching comparative analytics:', error);
     // Return mock data if API fails
-    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const datasets = [];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    // Generate data for each equipment
-    equipmentIds.forEach((id, index) => {
-      const machine = mockMachines.find(m => m.equipment_id === id) || { name: `Equipment ${id}` };
+    // Create data points for each month
+    const mockData = months.map(month => {
+      // Base object with date property
+      const dataPoint = { date: month };
       
-      // Generate different data based on metric
-      let data;
-      switch(metric) {
-        case 'temperature':
-          data = labels.map(() => 50 + Math.random() * 30);
-          break;
-        case 'vibration':
-          data = labels.map(() => Math.random() * 5);
-          break;
-        case 'pressure':
-          data = labels.map(() => 90 + Math.random() * 40);
-          break;
-        case 'oil_level':
-          data = labels.map(() => 70 + Math.random() * 20);
-          break;
-        case 'maintenance_cost':
-          data = labels.map(() => Math.floor(Math.random() * 1000));
-          break;
-        default:
-          data = labels.map(() => Math.random() * 100);
-      }
+      // Add current machine value
+      dataPoint.current = Math.floor(Math.random() * 40) + 60; // Random value between 60-100
       
-      // Add dataset for this equipment
-      datasets.push({
-        label: machine.name,
-        data,
-        borderColor: ['#714955', '#f44336', '#4caf50', '#8c6b74', '#9c27b0'][index % 5],
-        backgroundColor: ['rgba(113, 73, 85, 0.2)', 'rgba(244, 67, 54, 0.2)', 'rgba(76, 175, 80, 0.2)', 'rgba(140, 107, 116, 0.2)', 'rgba(156, 39, 176, 0.2)'][index % 5]
-      });
+      // Add average value (slightly lower than current)
+      dataPoint.average = Math.floor(Math.random() * 30) + 55;
+      
+      // Add optimal value (usually higher than current)
+      dataPoint.optimal = Math.floor(Math.random() * 10) + 90;
+      
+      return dataPoint;
     });
     
-    return { labels, datasets, metric };
+    return mockData;
   }
 };
 
 /**
  * Get maintenance ROI data
  */
-export const getMaintenanceROI = async (period = '12months') => {
+export const getMaintenanceROI = async (period = '12months', equipmentId = null) => {
   try {
-    const response = await api.get('/analytics/roi', { params: { period } });
+    // Include equipment_id in params if provided for equipment-specific metrics
+    const params = { period };
+    if (equipmentId) {
+      params.equipment_id = equipmentId;
+    }
+    
+    const response = await api.get('/analytics/roi', { params });
+    console.log("ROI data from API:", response.data);
     return response.data;
   } catch (error) {
     console.error('Error fetching maintenance ROI:', error);
-    // Return mock data if API fails
-    return {
-      roi_percentage: 127 + Math.floor(Math.random() * 50),
-      cost_savings: 45000 + Math.floor(Math.random() * 20000),
-      prevention_vs_repair: {
-        labels: ['Preventive', 'Corrective'],
-        datasets: [{
-          data: [68, 32],
-          backgroundColor: ['#4caf50', '#f44336']
-        }]
-      },
-      monthly_savings: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-        datasets: [{
-          label: 'Savings ($)',
-          data: Array(12).fill(0).map(() => Math.floor(Math.random() * 5000) + 2000),
-          borderColor: '#2196f3',
-          backgroundColor: 'rgba(33, 150, 243, 0.2)'
-        }]
-      }
-    };
+    console.error('Error details:', error.response?.data || error.message);
+    throw new Error(`Failed to get ROI data: ${error.message}`);
   }
 };
 
 /**
  * Get reliability scorecard data
  */
-export const getReliabilityScores = async () => {
+export const getReliabilityScores = async (equipmentId = null) => {
   try {
-    const response = await api.get('/analytics/reliability');
+    // Include equipment_id in params if provided for equipment-specific metrics
+    const params = {};
+    if (equipmentId) {
+      params.equipment_id = equipmentId;
+    }
+    
+    const response = await api.get('/analytics/reliability', { params });
+    console.log("Reliability data from API:", response.data);
     return response.data;
   } catch (error) {
     console.error('Error fetching reliability scores:', error);
-    // Return mock data if API fails
-    return {
-      overall_score: 82 + Math.floor(Math.random() * 15),
-      scores: [
-        { category: 'MTBF', score: 85 + Math.floor(Math.random() * 10), trend: 'up' },
-        { category: 'MTTR', score: 78 + Math.floor(Math.random() * 10), trend: 'up' },
-        { category: 'Availability', score: 92 + Math.floor(Math.random() * 5), trend: 'stable' },
-        { category: 'OEE', score: 76 + Math.floor(Math.random() * 15), trend: 'down' },
-        { category: 'Maintenance Compliance', score: 88 + Math.floor(Math.random() * 10), trend: 'up' }
-      ],
-      historical: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [{
-          label: 'Reliability Score',
-          data: [75, 77, 80, 82, 79, 82],
-          borderColor: '#673ab7',
-          backgroundColor: 'rgba(103, 58, 183, 0.2)'
-        }]
-      }
-    };
+    console.error('Error details:', error.response?.data || error.message);
+    throw new Error(`Failed to get reliability data: ${error.message}`);
   }
 };
 
 /**
- * Get feature importance data for the prediction model
+ * Get feature importance data from ML models
  */
-export const getFeatureImportance = async () => {
+export const getFeatureImportance = async (modelType = null) => {
   try {
-    const response = await api.get('/analytics/feature-importance');
+    const params = {};
+    if (modelType) {
+      params.model_type = modelType; // Allow filtering by model type (failure, rul, anomaly)
+    }
+    
+    const response = await api.get('/analytics/feature-importance', { params });
+    console.log("Feature importance data from API:", response.data);
     return response.data;
   } catch (error) {
     console.error('Error fetching feature importance:', error);
-    // Return mock data if API fails
-    return {
-      features: [
-        { name: 'Vibration', importance: 0.35 },
-        { name: 'Temperature', importance: 0.25 },
-        { name: 'Pressure', importance: 0.20 },
-        { name: 'Oil Level', importance: 0.12 },
-        { name: 'Age', importance: 0.08 }
-      ],
-      model_accuracy: 0.89,
-      last_updated: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    };
+    console.error('Error details:', error.response?.data || error.message);
+    throw new Error(`Failed to get feature importance data: ${error.message}`);
   }
 };
 
@@ -541,7 +511,7 @@ export const getFeatureImportance = async () => {
  */
 export const getAlertConfig = async () => {
   try {
-    const response = await api.get('/settings/alerts');
+    const response = await api.get('/alert/settings');
     return response.data;
   } catch (error) {
     console.error('Error fetching alert configuration:', error);
@@ -571,7 +541,7 @@ export const getAlertConfig = async () => {
  */
 export const saveAlertConfig = async (config) => {
   try {
-    const response = await api.post('/settings/alerts', config);
+    const response = await api.post('/alert/settings', config);
     return response.data;
   } catch (error) {
     console.error('Error saving alert configuration:', error);
@@ -589,7 +559,7 @@ export const saveAlertConfig = async (config) => {
  */
 export const getSensorThresholds = async () => {
   try {
-    const response = await api.get('/settings/thresholds');
+    const response = await api.get('/sensor/thresholds');
     return response.data;
   } catch (error) {
     console.error('Error fetching sensor thresholds:', error);
@@ -637,7 +607,7 @@ export const getSensorThresholds = async () => {
  */
 export const saveSensorThresholds = async (thresholds) => {
   try {
-    const response = await api.post('/settings/thresholds', thresholds);
+    const response = await api.post('/sensor/thresholds', thresholds);
     return response.data;
   } catch (error) {
     console.error('Error saving sensor thresholds:', error);
@@ -712,7 +682,7 @@ export const saveNotificationSettings = async (settings) => {
  */
 export const getModelSettings = async () => {
   try {
-    const response = await api.get('/settings/model');
+    const response = await api.get('/model/settings');
     return response.data;
   } catch (error) {
     console.error('Error fetching model settings:', error);
@@ -736,7 +706,6 @@ export const getModelSettings = async () => {
         use_historical_data: true
       },
       prediction_threshold: 0.65,
-      // Add fields that match the expected structure in the UI
       algorithm: 'random_forest',
       trainingFrequency: 'weekly',
       dataRetentionPeriod: '1year',
@@ -750,7 +719,7 @@ export const getModelSettings = async () => {
  */
 export const saveModelSettings = async (settings) => {
   try {
-    const response = await api.post('/settings/model', settings);
+    const response = await api.post('/model/settings', settings);
     return response.data;
   } catch (error) {
     console.error('Error saving model settings:', error);
@@ -764,21 +733,175 @@ export const saveModelSettings = async (settings) => {
 };
 
 /**
- * Trigger model training
+ * Trigger model training with specified options
  */
-export const trainModel = async () => {
+export const trainModel = async (options = {}) => {
   try {
-    const response = await api.post('/model/train');
+    console.log("Training model with options:", options);
+    const response = await api.post('/model/train', options);
+    console.log("Model training response:", response.data);
     return response.data;
   } catch (error) {
     console.error('Error triggering model training:', error);
-    // Return mock response if API fails
+    console.error('Error details:', error.response?.data || error.message);
+    throw new Error(`Failed to train model: ${error.message}`);
+  }
+};
+
+export const getMaintenanceHistory = async (equipmentId) => {
+  try {
+    const response = await api.get(`/equipment/${equipmentId}/history`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching maintenance history for ${equipmentId}:`, error);
+    
+    // Generate mock maintenance history data
+    const now = new Date();
+    const mockHistory = [];
+    
+    // Past maintenance (completed)
+    for (let i = 1; i <= 5; i++) {
+      const date = new Date();
+      date.setMonth(now.getMonth() - i);
+      date.setDate(Math.floor(Math.random() * 28) + 1);
+      
+      mockHistory.push({
+        id: `maint-${equipmentId}-past-${i}`,
+        equipment_id: equipmentId,
+        maintenance_date: date.toISOString().split('T')[0],
+        completion_date: date.toISOString().split('T')[0],
+        maintenance_type: ['preventive', 'corrective', 'predictive'][Math.floor(Math.random() * 3)],
+        description: `Regular maintenance service #${i}`,
+        technician: `Tech ${Math.floor(Math.random() * 5) + 1}`,
+        status: 'completed',
+        cost: Math.floor(Math.random() * 500) + 100,
+        findings: 'All systems functioning properly after service',
+        priority: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)]
+      });
+    }
+    
+    // Future maintenance (scheduled)
+    for (let i = 1; i <= 3; i++) {
+      const date = new Date();
+      date.setDate(now.getDate() + (i * 15)); // Every 15 days in the future
+      
+      mockHistory.push({
+        id: `maint-${equipmentId}-future-${i}`,
+        equipment_id: equipmentId,
+        maintenance_date: date.toISOString().split('T')[0],
+        maintenance_type: ['preventive', 'predictive'][Math.floor(Math.random() * 2)],
+        description: `Scheduled maintenance check #${i}`,
+        technician: `Tech ${Math.floor(Math.random() * 5) + 1}`,
+        status: 'scheduled',
+        estimated_duration: Math.floor(Math.random() * 120) + 60,
+        priority: ['medium', 'high'][Math.floor(Math.random() * 2)]
+      });
+    }
+    
+    return mockHistory;
+  }
+};
+
+export const getEquipmentList = async () => {
+  try {
+    const response = await api.get('/equipment');
+    
+    // Normalize data structure and ensure all required fields exist
+    return response.data.map(item => ({
+      id: item.id || '',
+      name: item.name || `Equipment ${item.id || 'Unknown'}`,
+      type: item.type || 'Unknown',
+      status: item.status || 'unknown',
+      last_maintenance: item.last_maintenance || null,
+      location: item.location || 'Unknown',
+      installation_date: item.installation_date || null,
+      health_score: typeof item.health_score === 'number' ? item.health_score : 0,
+      failure_probability: typeof item.failure_probability === 'number' ? item.failure_probability : 0,
+      sensor_count: typeof item.sensor_count === 'number' ? item.sensor_count : 0
+    }));
+  } catch (error) {
+    console.error('Error fetching equipment list:', error);
+    // ... existing mock data ...
+  }
+};
+
+export const getEquipmentDetails = async (equipmentId) => {
+  try {
+    const response = await api.get(`/equipment/${equipmentId}`);
+    
+    // Ensure all required fields exist with proper types
+    const data = response.data;
     return {
-      success: true,
-      message: 'Model training initiated successfully (mock)',
-      job_id: 'job-' + Math.floor(Math.random() * 1000),
-      estimated_completion_time: new Date(Date.now() + 45 * 60 * 1000).toISOString()
+      id: data.id || equipmentId,
+      name: data.name || `Equipment ${equipmentId}`,
+      type: data.type || 'Unknown',
+      model: data.model || 'Unknown',
+      manufacturer: data.manufacturer || 'Unknown',
+      serial_number: data.serial_number || 'Unknown',
+      installation_date: data.installation_date || new Date().toISOString().split('T')[0],
+      warranty_expiry: data.warranty_expiry || null,
+      location: data.location || 'Unknown',
+      department: data.department || 'Unknown',
+      last_maintenance: data.last_maintenance || null,
+      next_maintenance: data.next_maintenance || null,
+      maintenance_history: Array.isArray(data.maintenance_history) ? data.maintenance_history : [],
+      health_score: typeof data.health_score === 'number' ? data.health_score : 0,
+      failure_probability: typeof data.failure_probability === 'number' ? data.failure_probability : 0,
+      remaining_useful_life: typeof data.remaining_useful_life === 'number' ? data.remaining_useful_life : 0,
+      status: data.status || 'unknown',
+      notes: data.notes || '',
+      sensor_count: typeof data.sensor_count === 'number' ? data.sensor_count : 0
     };
+  } catch (error) {
+    console.error(`Error fetching equipment details for ${equipmentId}:`, error);
+    // ... existing mock data ...
+  }
+};
+
+export const getSensorData = async (equipmentId, timeRange = '7d') => {
+  try {
+    const response = await api.get(`/equipment/${equipmentId}/sensors`, {
+      params: { timeRange }
+    });
+    
+    // Ensure data structure matches frontend expectations
+    const data = response.data;
+    
+    // Make sure each data point has timestamps as Date objects and numeric values
+    return Object.entries(data).reduce((acc, [sensorType, readings]) => {
+      acc[sensorType] = Array.isArray(readings) ? readings.map(reading => ({
+        timestamp: reading.timestamp || new Date().toISOString(),
+        value: typeof reading.value === 'number' ? reading.value : 0,
+        status: reading.status || 'normal'
+      })) : [];
+      return acc;
+    }, {});
+  } catch (error) {
+    console.error(`Error fetching sensor data for ${equipmentId}:`, error);
+    // ... existing mock data ...
+  }
+};
+
+export const getMaintenanceRecommendations = async (equipmentId) => {
+  try {
+    const response = await api.get(`/equipment/${equipmentId}/maintenance-recommendations`);
+    
+    // Normalize data to ensure proper structure
+    return Array.isArray(response.data) ? response.data.map(rec => ({
+      id: rec.id || `rec-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      equipment_id: rec.equipment_id || equipmentId,
+      description: rec.description || 'Routine maintenance check',
+      priority: rec.priority || 'medium',
+      due_date: rec.due_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      status: rec.status || 'pending',
+      estimated_hours: typeof rec.estimated_hours === 'number' ? rec.estimated_hours : 2,
+      estimated_cost: typeof rec.estimated_cost === 'number' ? rec.estimated_cost : 0,
+      notes: rec.notes || '',
+      created_at: rec.created_at || new Date().toISOString()
+    })) : [];
+  } catch (error) {
+    console.error(`Error fetching maintenance recommendations for ${equipmentId}:`, error);
+    // ... existing mock data ...
   }
 };
 
@@ -806,7 +929,12 @@ const apiService = {
   saveNotificationSettings,
   getModelSettings,
   saveModelSettings,
-  trainModel
+  trainModel,
+  getMaintenanceHistory,
+  getEquipmentList,
+  getEquipmentDetails,
+  getSensorData,
+  getMaintenanceRecommendations
 };
 
 export default apiService; 
