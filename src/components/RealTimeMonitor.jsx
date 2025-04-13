@@ -40,8 +40,12 @@ const RealTimeMonitor = () => {
 
   // Define fetchSensorData using useCallback before any useEffect that depends on it
   const fetchSensorData = useCallback(async () => {
-    if (!selectedMachine) return;
+    if (!selectedMachine) {
+      console.warn("fetchSensorData called with no selected machine");
+      return;
+    }
     
+    console.log("Fetching sensor data for:", selectedMachine);
     setLoading(true);
     try {
       // Fetch recent readings for the selected machine
@@ -50,15 +54,31 @@ const RealTimeMonitor = () => {
       };
       
       const response = await getMachineReadings(selectedMachine.equipment_id, params);
-      console.log("Fetched sensor readings:", response);
+      console.log("Raw response from getMachineReadings:", response);
       
       // Ensure we access the readings array from the response
+      let readings = [];
       if (response && typeof response === 'object') {
-        const readings = response.readings || [];
-        if (Array.isArray(readings)) {
-          setSensorData(readings);
+        // Try different property paths that might contain the readings
+        if (Array.isArray(response)) {
+          console.log("Response is an array with length:", response.length);
+          readings = response;
+        } else if (response.readings && Array.isArray(response.readings)) {
+          console.log("Response has readings array with length:", response.readings.length);
+          readings = response.readings;
+        } else if (response.data && Array.isArray(response.data)) {
+          console.log("Response has data array with length:", response.data.length);
+          readings = response.data;
         } else {
-          console.warn("API returned non-array readings:", readings);
+          console.warn("Response doesn't contain a valid readings array:", response);
+        }
+        
+        if (readings.length > 0) {
+          console.log("First reading sample:", readings[0]);
+          setSensorData(readings);
+          setError(null);
+        } else {
+          console.warn("No readings found in response");
           setSensorData([]);
         }
       } else {
@@ -68,14 +88,11 @@ const RealTimeMonitor = () => {
       
       setLastUpdated(new Date());
       
-      // Check if we have valid sensor data to run prediction
-      const validReadings = sensorData.length > 0 ? sensorData : (
-        response && response.readings && Array.isArray(response.readings) && response.readings.length > 0
-          ? response.readings : []
-      );
-      
-      if (validReadings.length > 0) {
-        const latestReading = validReadings[0];
+      // Only run prediction if we have valid readings
+      if (readings.length > 0) {
+        const latestReading = readings[0];
+        console.log("Using latest reading for prediction:", latestReading);
+        
         const predictionInput = {
           timestamp: latestReading.timestamp,
           equipment_id: selectedMachine.equipment_id,
@@ -99,8 +116,6 @@ const RealTimeMonitor = () => {
       } else {
         console.warn("No sensor readings available to run prediction");
       }
-      
-      setError(null);
     } catch (err) {
       console.error("Error in fetchSensorData:", err);
       setError('Failed to fetch sensor data: ' + (err.message || 'Unknown error'));
@@ -110,10 +125,147 @@ const RealTimeMonitor = () => {
     }
   }, [selectedMachine]);
 
+  // Fetch machines on component mount - only once
+  useEffect(() => {
+    const fetchMachines = async () => {
+      try {
+        const data = await getMachines();
+        console.log("Fetched machines:", data);
+        if (Array.isArray(data) && data.length > 0) {
+          setMachines(data);
+          // Only select the first machine by default if no machine is selected yet
+          if (!selectedMachine) {
+            console.log("Setting default selected machine:", data[0]);
+            setSelectedMachine(data[0]);
+          }
+        } else {
+          console.warn("No machines returned from API or invalid format");
+          setMachines([]);
+        }
+      } catch (err) {
+        console.error("Error fetching machines:", err);
+        setError('Failed to fetch equipment list: ' + (err.message || 'Unknown error'));
+      }
+    };
+
+    fetchMachines();
+    // Don't include selectedMachine in the dependency array to avoid re-fetching
+  }, []); 
+
+  // Separate effect hook for handling initial selection
+  useEffect(() => {
+    // If we have machines but no selection, select the first machine
+    if (machines.length > 0 && !selectedMachine) {
+      console.log("Setting initial machine selection:", machines[0]);
+      setSelectedMachine(machines[0]);
+    }
+  }, [machines, selectedMachine]);
+
+  // Fetch sensor data for selected machine
+  useEffect(() => {
+    if (selectedMachine) {
+      console.log("Selected machine changed, fetching sensor data for:", selectedMachine);
+      fetchSensorData();
+    }
+  }, [selectedMachine, fetchSensorData]);
+
+  // Auto-refresh data
+  useEffect(() => {
+    let interval;
+    
+    if (autoRefresh && selectedMachine) {
+      interval = setInterval(() => {
+        fetchSensorData();
+      }, updateInterval * 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [autoRefresh, updateInterval, selectedMachine, fetchSensorData]);
+
+  const handleSelectMachine = (machine) => {
+    console.log("Machine selected:", machine);
+    setSelectedMachine(machine);
+    // Clear previous data when selecting a new machine
+    setSensorData([]);
+    setPrediction(null);
+  };
+  
+  const handleScheduleMaintenance = (machine) => {
+    if (!machine) return;
+    
+    // Navigate to maintenance scheduler or open maintenance dialog
+    console.log('Schedule maintenance for:', machine.equipment_id);
+    alert(`Maintenance would be scheduled for ${machine.name}`);
+    
+    // You could also implement a call to scheduleMaintenance API here
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Not available';
+    try {
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleString();
+    } catch (err) {
+      return 'Invalid date';
+    }
+  };
+
+  // Format sensor data for chart with safety checks
+  const chartData = React.useMemo(() => {
+    if (!Array.isArray(sensorData) || sensorData.length === 0) {
+      return [];
+    }
+    
+    return sensorData.map(reading => {
+      if (!reading) return null;
+      
+      let timestamp;
+      try {
+        const date = new Date(reading.timestamp);
+        timestamp = isNaN(date.getTime()) ? 'Invalid time' : date.toLocaleTimeString();
+      } catch (err) {
+        timestamp = 'Invalid time';
+      }
+      
+      return {
+        timestamp,
+        temperature: typeof reading.temperature === 'number' ? reading.temperature : 0,
+        vibration: typeof reading.vibration === 'number' ? reading.vibration : 0,
+        pressure: typeof reading.pressure === 'number' ? reading.pressure : 0,
+        oil_level: typeof reading.oil_level === 'number' ? reading.oil_level : 0
+      };
+    }).filter(Boolean).reverse();
+  }, [sensorData]);
+
+  // Helper function to safely access prediction values
+  const getPredictionValue = (path, defaultValue = 0) => {
+    if (!prediction) return defaultValue;
+    
+    const parts = path.split('.');
+    let value = prediction;
+    
+    for (const part of parts) {
+      if (value === null || value === undefined || typeof value !== 'object') {
+        return defaultValue;
+      }
+      value = value[part];
+    }
+    
+    return value === null || value === undefined ? defaultValue : value;
+  };
+
   // Run a prediction manually
   const handleRunPrediction = async () => {
-    if (!selectedMachine || !Array.isArray(sensorData) || sensorData.length === 0) {
-      setError('Cannot run prediction: No machine selected or no sensor data available');
+    if (!selectedMachine) {
+      setError('Cannot run prediction: No machine selected');
+      return;
+    }
+    
+    if (!Array.isArray(sensorData) || sensorData.length === 0) {
+      setError('Cannot run prediction: No sensor data available');
       return;
     }
     
@@ -144,111 +296,6 @@ const RealTimeMonitor = () => {
     }
   };
 
-  // Fetch machines on component mount
-  useEffect(() => {
-    const fetchMachines = async () => {
-      try {
-        const data = await getMachines();
-        console.log("Fetched machines:", data);
-        setMachines(data);
-        // Select the first machine by default
-        if (data.length > 0 && !selectedMachine) {
-          setSelectedMachine(data[0]);
-        }
-      } catch (err) {
-        console.error("Error fetching machines:", err);
-        setError('Failed to fetch equipment list: ' + (err.message || 'Unknown error'));
-      }
-    };
-
-    fetchMachines();
-  }, [selectedMachine]);
-
-  // Fetch sensor data for selected machine
-  useEffect(() => {
-    if (selectedMachine) {
-      fetchSensorData();
-    }
-  }, [selectedMachine, fetchSensorData]);
-
-  // Auto-refresh data
-  useEffect(() => {
-    let interval;
-    
-    if (autoRefresh && selectedMachine) {
-      interval = setInterval(() => {
-        fetchSensorData();
-      }, updateInterval * 1000);
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoRefresh, updateInterval, selectedMachine, fetchSensorData]);
-
-  const handleSelectMachine = (machine) => {
-    setSelectedMachine(machine);
-  };
-  
-  const handleScheduleMaintenance = (machine) => {
-    if (!machine) return;
-    
-    // Navigate to maintenance scheduler or open maintenance dialog
-    console.log('Schedule maintenance for:', machine.equipment_id);
-    alert(`Maintenance would be scheduled for ${machine.name}`);
-    
-    // You could also implement a call to scheduleMaintenance API here
-  };
-
-  // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Not available';
-    try {
-      const date = new Date(dateString);
-      return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleString();
-    } catch (err) {
-      return 'Invalid date';
-    }
-  };
-
-  // Format sensor data for chart with safety checks
-  const chartData = Array.isArray(sensorData) ? sensorData.map(reading => {
-    if (!reading) return null;
-    
-    let timestamp;
-    try {
-      const date = new Date(reading.timestamp);
-      timestamp = isNaN(date.getTime()) ? 'Invalid time' : date.toLocaleTimeString();
-    } catch (err) {
-      timestamp = 'Invalid time';
-    }
-    
-    return {
-      timestamp,
-      temperature: typeof reading.temperature === 'number' ? reading.temperature : 0,
-      vibration: typeof reading.vibration === 'number' ? reading.vibration : 0,
-      pressure: typeof reading.pressure === 'number' ? reading.pressure : 0,
-      oil_level: typeof reading.oil_level === 'number' ? reading.oil_level : 0
-    };
-  }).filter(Boolean).reverse() : [];
-
-  // Helper function to safely access prediction values
-  const getPredictionValue = (path, defaultValue = 0) => {
-    if (!prediction) return defaultValue;
-    
-    const parts = path.split('.');
-    let value = prediction;
-    
-    for (const part of parts) {
-      if (value === null || value === undefined || typeof value !== 'object') {
-        return defaultValue;
-      }
-      value = value[part];
-    }
-    
-    return value === null || value === undefined ? defaultValue : value;
-  };
-
   return (
     <motion.div 
       initial="hidden"
@@ -264,7 +311,7 @@ const RealTimeMonitor = () => {
             transition={{ duration: 0.5 }}
           >
             <Paper sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h5" component="h2">
+              <Typography variant="h5">
                 Real-Time Equipment Monitor
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -417,7 +464,7 @@ const RealTimeMonitor = () => {
                       </Box>
                     )}
                     
-                    {sensorData && sensorData.length > 0 ? (
+                    {Array.isArray(chartData) && chartData.length > 0 ? (
                       <Box sx={{ height: 250, mb: 3 }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={chartData}>
@@ -436,7 +483,9 @@ const RealTimeMonitor = () => {
                     ) : (
                       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250, mb: 3 }}>
                         <Alert severity="warning">
-                          No sensor data available for this equipment. Please refresh or select another equipment.
+                          {selectedMachine ? 
+                            'No sensor data available for this equipment. Please refresh or select another equipment.' : 
+                            'No equipment selected. Please select an equipment to view sensor data.'}
                         </Alert>
                       </Box>
                     )}
