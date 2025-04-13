@@ -23,6 +23,9 @@ import AccessTime from '@mui/icons-material/AccessTime';
 import Timeline from '@mui/icons-material/Timeline';
 import { getMachines, getMachineReadings, runPrediction, scheduleMaintenance } from '../services/api';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { motion, AnimatePresence } from 'framer-motion';
+import { fadeIn, slideUp, fadeInUp, staggerContainer } from '../utils/animations';
+import ScrollAnimationWrapper from './ScrollAnimationWrapper';
 
 const RealTimeMonitor = () => {
   const [machines, setMachines] = useState([]);
@@ -47,11 +50,12 @@ const RealTimeMonitor = () => {
       };
       
       const readings = await getMachineReadings(selectedMachine.equipment_id, params);
+      console.log("Fetched sensor readings:", readings);
       setSensorData(readings);
       setLastUpdated(new Date());
       
       // Run prediction with the most recent reading
-      if (readings.length > 0) {
+      if (readings && readings.length > 0) {
         const latestReading = readings[0];
         const predictionInput = {
           timestamp: latestReading.timestamp,
@@ -64,32 +68,76 @@ const RealTimeMonitor = () => {
           }
         };
         
-        const predictionResult = await runPrediction(predictionInput);
-        console.log("Prediction result:", predictionResult); // Add logging to debug
-        setPrediction(predictionResult);
+        console.log("Running prediction with input:", predictionInput);
+        try {
+          const predictionResult = await runPrediction(predictionInput);
+          console.log("Prediction result:", predictionResult);
+          setPrediction(predictionResult);
+        } catch (predictionError) {
+          console.error("Error running prediction:", predictionError);
+          setError(`Failed to run prediction: ${predictionError.message}`);
+        }
+      } else {
+        console.warn("No sensor readings available to run prediction");
       }
       
       setError(null);
     } catch (err) {
-      console.error("Error in fetchSensorData:", err); // Add detailed error logging
-      setError('Failed to fetch sensor data: ' + err.message);
+      console.error("Error in fetchSensorData:", err);
+      setError('Failed to fetch sensor data: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
   }, [selectedMachine]);
+
+  // Run a prediction manually
+  const handleRunPrediction = async () => {
+    if (!selectedMachine || !sensorData || sensorData.length === 0) {
+      setError('Cannot run prediction: No machine selected or no sensor data available');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const latestReading = sensorData[0];
+      const predictionInput = {
+        timestamp: latestReading.timestamp,
+        equipment_id: selectedMachine.equipment_id,
+        readings: {
+          temperature: latestReading.temperature,
+          vibration: latestReading.vibration,
+          pressure: latestReading.pressure,
+          oil_level: latestReading.oil_level
+        }
+      };
+      
+      console.log("Manually running prediction with input:", predictionInput);
+      const predictionResult = await runPrediction(predictionInput);
+      console.log("Manual prediction result:", predictionResult);
+      setPrediction(predictionResult);
+      setError(null);
+    } catch (err) {
+      console.error("Error in manual prediction:", err);
+      setError('Failed to run prediction: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fetch machines on component mount
   useEffect(() => {
     const fetchMachines = async () => {
       try {
         const data = await getMachines();
+        console.log("Fetched machines:", data);
         setMachines(data);
         // Select the first machine by default
         if (data.length > 0 && !selectedMachine) {
           setSelectedMachine(data[0]);
         }
       } catch (err) {
-        setError('Failed to fetch equipment list: ' + err.message);
+        console.error("Error fetching machines:", err);
+        setError('Failed to fetch equipment list: ' + (err.message || 'Unknown error'));
       }
     };
 
@@ -180,388 +228,316 @@ const RealTimeMonitor = () => {
   };
 
   return (
-    <Grid container spacing={3}>
-      {/* Header */}
-      <Grid item xs={12}>
-        <Paper sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h5" component="h2">
-            Real-Time Equipment Monitor
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              Last updated: {lastUpdated.toLocaleTimeString()}
-            </Typography>
-            <Button 
-              variant="outlined" 
-              size="small" 
-              onClick={fetchSensorData}
-              disabled={loading}
-            >
-              Refresh
-            </Button>
-          </Box>
-        </Paper>
-      </Grid>
-
-      {/* Equipment List */}
-      <Grid item xs={12} md={3}>
-        <Paper sx={{ p: 2, height: '100%' }}>
-          <Typography variant="h6" gutterBottom>
-            Equipment
-          </Typography>
-          <Box sx={{ mt: 2 }}>
-            {machines.map((machine) => (
-              <Box 
-                key={machine.equipment_id}
-                sx={{ 
-                  p: 1,
-                  mb: 1,
-                  border: '1px solid',
-                  borderColor: selectedMachine?.equipment_id === machine.equipment_id ? 'primary.main' : 'divider',
-                  borderRadius: 1,
-                  bgcolor: selectedMachine?.equipment_id === machine.equipment_id ? 'action.selected' : 'background.paper',
-                  cursor: 'pointer'
-                }}
-                onClick={() => handleSelectMachine(machine)}
-              >
-                <Typography variant="body1" fontWeight="medium">
-                  {machine.name}
+    <motion.div 
+      initial="hidden"
+      animate="visible"
+      variants={fadeIn}
+    >
+      <Grid container spacing={3}>
+        {/* Header */}
+        <Grid item xs={12}>
+          <motion.div
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Paper sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h5" component="h2">
+                Real-Time Equipment Monitor
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Last updated: {lastUpdated.toLocaleTimeString()}
                 </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    {machine.equipment_id}
-                  </Typography>
-                </Box>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button 
+                    variant="outlined" 
+                    size="small" 
+                    onClick={fetchSensorData}
+                    disabled={loading}
+                  >
+                    Refresh
+                  </Button>
+                </motion.div>
               </Box>
-            ))}
-          </Box>
-        </Paper>
-      </Grid>
-
-      {/* Main Content */}
-      <Grid item xs={12} md={9}>
-        {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+            </Paper>
+          </motion.div>
+        </Grid>
         
-        {loading && <LinearProgress sx={{ mb: 2 }} />}
+        {/* Main content */}
+        <Grid item xs={12} md={4}>
+          <ScrollAnimationWrapper variants={slideUp}>
+            <Paper sx={{ p: 2, height: '100%' }}>
+              <Typography variant="h6" component="h3" gutterBottom>
+                Equipment List
+              </Typography>
+              
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+                </motion.div>
+              )}
+              
+              {loading && machines.length === 0 ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                  <motion.div 
+                    animate={{ 
+                      rotate: 360,
+                      transition: { 
+                        duration: 2, 
+                        repeat: Infinity, 
+                        ease: "linear" 
+                      }
+                    }}
+                  >
+                    <CircularProgress />
+                  </motion.div>
+                </Box>
+              ) : (
+                <motion.div 
+                  variants={staggerContainer}
+                  style={{ opacity: 1 }}
+                >
+                  {machines.map((machine, index) => (
+                    <motion.div 
+                      key={machine.equipment_id} 
+                      variants={fadeInUp}
+                      custom={index}
+                      whileHover={{ 
+                        scale: 1.02, 
+                        boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)" 
+                      }}
+                      style={{ opacity: 1 }}
+                    >
+                      <Paper 
+                        elevation={selectedMachine?.equipment_id === machine.equipment_id ? 3 : 1}
+                        sx={{ 
+                          p: 2, 
+                          mb: 2, 
+                          cursor: 'pointer',
+                          borderLeft: selectedMachine?.equipment_id === machine.equipment_id ? '4px solid #714955' : 'none',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={() => handleSelectMachine(machine)}
+                      >
+                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                          {machine.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Type: {machine.type}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Location: {machine.location || 'Unknown'}
+                        </Typography>
+                      </Paper>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </Paper>
+          </ScrollAnimationWrapper>
+        </Grid>
         
-        {selectedMachine ? (
-          <>
-            {/* Machine Overview */}
-            <Paper sx={{ p: 2, mb: 3 }}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="h6">{selectedMachine.name}</Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    ID: {selectedMachine.equipment_id} | Model: {selectedMachine.model}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-                    <Chip 
-                      icon={<AccessTime />} 
-                      label={`Installed: ${selectedMachine.installation_date ? 
-                        (new Date(selectedMachine.installation_date).toString() !== 'Invalid Date' ? 
-                          new Date(selectedMachine.installation_date).toLocaleDateString() : 
-                          'Unknown date') : 
-                        'Unknown'}`} 
-                      variant="outlined" 
-                      size="small"
-                    />
-                    <Chip 
-                      icon={<Timeline />} 
-                      label={`Last maintenance: ${selectedMachine.last_maintenance_date ? 
-                        (new Date(selectedMachine.last_maintenance_date).toString() !== 'Invalid Date' ? 
-                          new Date(selectedMachine.last_maintenance_date).toLocaleDateString() : 
-                          'Unknown date') : 
-                        'Unknown'}`} 
-                      variant="outlined" 
-                      size="small"
-                    />
-                  </Box>
-                </Grid>
-                
-                {/* Prediction Status */}
-                <Grid item xs={12} md={6}>
-                  {prediction ? (
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="h6" gutterBottom>Equipment Health</Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
-                        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                          <CircularProgress 
-                            variant="determinate" 
-                            value={100 - (
-                              prediction.prediction && typeof prediction.prediction === 'object' 
-                                ? prediction.prediction.failure_probability * 100
-                                : prediction.probability * 100
-                            )} 
-                            sx={{ 
-                              color: 'primary.main',
-                              '& circle': {
-                                strokeLinecap: 'round',
-                              }
-                            }}
-                            size={60}
-                            thickness={6}
-                          />
-                          <Box
-                            sx={{
-                              top: 0,
-                              left: 0,
-                              bottom: 0,
-                              right: 0,
-                              position: 'absolute',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
+        {/* Sensor readings and visualization */}
+        <Grid item xs={12} md={8}>
+          <AnimatePresence mode="wait">
+            {selectedMachine ? (
+              <motion.div
+                key={selectedMachine?.equipment_id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ScrollAnimationWrapper variants={slideUp}>
+                  <Paper sx={{ p: 2, height: '100%' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6" component="h3">
+                        {selectedMachine.name} - Sensor Readings
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="primary"
+                            onClick={handleRunPrediction}
+                            disabled={loading || !sensorData || sensorData.length === 0}
                           >
-                            <Typography variant="body2" color="text.secondary">
-                              {Math.round(100 - (
-                                prediction.prediction && typeof prediction.prediction === 'object'
-                                  ? prediction.prediction.failure_probability * 100
-                                  : prediction.probability * 100
-                              ))}%
-                            </Typography>
-                          </Box>
-                        </Box>
-                        <Box>
-                          <Typography variant="h6">
-                            Health Score
-                          </Typography>
-                          <Typography variant="body2">
-                            {prediction.prediction && typeof prediction.prediction === 'object'
-                              ? prediction.prediction.remaining_useful_life_days 
-                              : prediction.estimated_time_to_failure} days remaining
-                          </Typography>
-                        </Box>
+                            Run Prediction
+                          </Button>
+                        </motion.div>
+                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                          <Button 
+                            size="small" 
+                            variant="outlined" 
+                            onClick={() => handleScheduleMaintenance(selectedMachine)}
+                          >
+                            Schedule Maintenance
+                          </Button>
+                        </motion.div>
                       </Box>
                     </Box>
-                  ) : (
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        No prediction data available
-                      </Typography>
-                    </Box>
-                  )}
-                </Grid>
-              </Grid>
-            </Paper>
-            
-            {/* Sensor Readings Chart */}
-            <Paper sx={{ p: 2, mb: 3 }}>
-              <Typography variant="h6" gutterBottom>Sensor Readings</Typography>
-              <Box sx={{ height: 300, mt: 2 }}>
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={chartData}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="timestamp" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="temperature" stroke="#f44336" name="Temperature" />
-                      <Line type="monotone" dataKey="vibration" stroke="#2196f3" name="Vibration" />
-                      <Line type="monotone" dataKey="pressure" stroke="#4caf50" name="Pressure" />
-                      <Line type="monotone" dataKey="oil_level" stroke="#714955" name="Oil Level" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                    <Typography variant="body2" color="text.secondary">No sensor data available</Typography>
-                  </Box>
-                )}
-              </Box>
-            </Paper>
-            
-            {/* Prediction Details */}
-            {prediction && (
-              <Paper sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>Prediction Details</Typography>
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ 
-                      p: 2, 
-                      border: '1px solid', 
-                      borderColor: 'divider',
-                      borderRadius: 1,
-                      bgcolor: 'background.paper',
-                      height: '100%'
-                    }}>
-                      <Typography variant="h6" component="div" sx={{ mb: 2 }}>
-                        Analysis
-                      </Typography>
-                      <Grid container spacing={3}>
-                        <Grid item xs={12} md={6}>
-                          <Paper sx={{ p: 2, height: '100%' }}>
-                            <Typography variant="subtitle1" gutterBottom>
-                              Failure Probability
-                            </Typography>
-                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 2 }}>
-                              <CircularProgress
-                                variant="determinate"
-                                value={Math.min((prediction.failure_probability || 0) * 100, 100)}
-                                size={100}
-                                thickness={4}
-                                sx={{ color: (theme) => theme.palette.primary.main }}
-                              />
-                              <Typography variant="h4" component="div" sx={{ position: 'absolute' }}>
-                                {Math.round((prediction.failure_probability || 0) * 100)}%
-                              </Typography>
-                            </Box>
-                          </Paper>
-                        </Grid>
-                        
-                        <Grid item xs={12} md={6}>
-                          <Paper sx={{ p: 2, height: '100%' }}>
-                            <Typography variant="subtitle1" gutterBottom>
-                              Anomaly Detection
-                            </Typography>
-                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                              <Chip
-                                icon={prediction.anomaly_detected ? <WarningAmber /> : <CheckCircle />}
-                                label={prediction.anomaly_detected ? 'Anomaly Detected' : 'Normal Operation'}
-                                color={prediction.anomaly_detected ? 'error' : 'success'}
-                                sx={{ fontSize: '1rem', py: 2, px: 1 }}
-                              />
-                            </Box>
-                            {typeof prediction.anomaly_score === 'number' && (
-                              <Typography variant="body2" color="textSecondary" align="center">
-                                Anomaly Score: {Math.round(prediction.anomaly_score * 100)}%
-                              </Typography>
-                            )}
-                          </Paper>
-                        </Grid>
-                      </Grid>
-                      {prediction.recommended_action && (
-                        <Paper sx={{ p: 2, mt: 3 }}>
-                          <Typography variant="subtitle1" gutterBottom>
-                            Maintenance Recommendation
+                    
+                    {loading && (
+                      <Box sx={{ width: '100%', mb: 2 }}>
+                        <motion.div
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: 1 }}
+                          transition={{ duration: 0.5 }}
+                          style={{ transformOrigin: 'left' }}
+                        >
+                          <LinearProgress />
+                        </motion.div>
+                      </Box>
+                    )}
+                    
+                    {sensorData && sensorData.length > 0 ? (
+                      <Box sx={{ height: 250, mb: 3 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="timestamp" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Line type="monotone" dataKey="temperature" stroke="#ff7300" name="Temperature (°C)" dot={{ r: 3 }} activeDot={{ r: 8 }} isAnimationActive={true} />
+                            <Line type="monotone" dataKey="vibration" stroke="#387908" name="Vibration (mm/s)" dot={{ r: 3 }} activeDot={{ r: 8 }} isAnimationActive={true} />
+                            <Line type="monotone" dataKey="pressure" stroke="#3366cc" name="Pressure (PSI)" dot={{ r: 3 }} activeDot={{ r: 8 }} isAnimationActive={true} />
+                            <Line type="monotone" dataKey="oil_level" stroke="#714955" name="Oil Level (%)" dot={{ r: 3 }} activeDot={{ r: 8 }} isAnimationActive={true} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250, mb: 3 }}>
+                        <Alert severity="warning">
+                          No sensor data available for this equipment. Please refresh or select another equipment.
+                        </Alert>
+                      </Box>
+                    )}
+                    
+                    {/* Rest of the component with prediction and analysis */}
+                    {prediction && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.2 }}
+                      >
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="h6" component="h4" gutterBottom>
+                            <Timeline sx={{ mr: 1, verticalAlign: 'middle' }} />
+                            Analysis
                           </Typography>
-                          <Alert 
-                            severity={
-                              prediction.failure_probability > 0.6 ? "error" : 
-                              prediction.failure_probability > 0.3 ? "warning" : "info"
-                            }
-                            sx={{ mb: 2 }}
-                          >
-                            {prediction.recommended_action === 'schedule_maintenance' 
-                              ? 'Immediate maintenance is recommended based on prediction analysis.' 
-                              : prediction.recommended_action === 'monitor'
-                              ? 'Increased monitoring is recommended. Schedule maintenance if condition worsens.'
-                              : 'Equipment is operating within normal parameters. Regular maintenance schedule can be followed.'}
-                          </Alert>
                           
-                          {prediction.failure_probability > 0.3 && (
-                            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                              <Button 
-                                variant="contained" 
-                                color="primary"
-                                onClick={() => handleScheduleMaintenance(selectedMachine)}
-                                disabled={!selectedMachine}
+                          <TableContainer component={Paper} variant="outlined">
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Parameter</TableCell>
+                                  <TableCell align="right">Value</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                <TableRow>
+                                  <TableCell>Failure Probability</TableCell>
+                                  <TableCell align="right">
+                                    <motion.div
+                                      initial={{ width: 0 }}
+                                      animate={{ width: '100%' }}
+                                      transition={{ duration: 0.8 }}
+                                    >
+                                      {(getPredictionValue('failure_probability') * 100).toFixed(2)}%
+                                    </motion.div>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>Anomaly Detected</TableCell>
+                                  <TableCell align="right">
+                                    {getPredictionValue('anomaly_detected') ? 'Yes' : 'No'}
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>Remaining Useful Life</TableCell>
+                                  <TableCell align="right">
+                                    {getPredictionValue('remaining_useful_life')} days
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>Maintenance Status</TableCell>
+                                  <TableCell align="right">
+                                    {getPredictionValue('maintenance_status', 'Unknown')}
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>Next Maintenance Date</TableCell>
+                                  <TableCell align="right">
+                                    {formatDate(getPredictionValue('next_maintenance_date'))}
+                                  </TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </Box>
+                        
+                        {/* Maintenance recommendation section */}
+                        {getPredictionValue('recommended_action') && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: 0.4 }}
+                          >
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="h6" component="h4" gutterBottom>
+                                <AccessTime sx={{ mr: 1, verticalAlign: 'middle' }} />
+                                Maintenance Recommendation
+                              </Typography>
+                              
+                              <Alert 
+                                severity={
+                                  getPredictionValue('failure_probability') > 0.6 ? "error" : 
+                                  getPredictionValue('failure_probability') > 0.3 ? "warning" : 
+                                  "info"
+                                }
+                                sx={{ mb: 2 }}
                               >
-                                Schedule Maintenance
-                              </Button>
+                                <Typography variant="body1">
+                                  <strong>Recommended Action:</strong> {getPredictionValue('recommended_action')}
+                                </Typography>
+                                {getPredictionValue('recommendation_details') && (
+                                  <Typography variant="body2" sx={{ mt: 1 }}>
+                                    {getPredictionValue('recommendation_details')}
+                                  </Typography>
+                                )}
+                              </Alert>
                             </Box>
-                          )}
-                        </Paper>
-                      )}
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TableContainer>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Parameter</TableCell>
-                            <TableCell align="right">Value</TableCell>
-                            <TableCell align="right">Status</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          <TableRow>
-                            <TableCell component="th" scope="row">
-                              Failure Probability
-                            </TableCell>
-                            <TableCell align="right">
-                              {typeof prediction.failure_probability === 'number' 
-                                ? (prediction.failure_probability * 100).toFixed(2) 
-                                : '0.00'}%
-                            </TableCell>
-                            <TableCell align="right">
-                              {typeof prediction.failure_probability !== 'number' ? (
-                                <AccessTime color="disabled" fontSize="small" />
-                              ) : prediction.failure_probability < 0.3 ? (
-                                <CheckCircle color="success" fontSize="small" />
-                              ) : prediction.failure_probability < 0.7 ? (
-                                <WarningAmber color="warning" fontSize="small" />
-                              ) : (
-                                <ErrorIcon color="error" fontSize="small" />
-                              )}
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell component="th" scope="row">
-                              Anomaly Detection
-                            </TableCell>
-                            <TableCell align="right">
-                              {prediction.anomaly_detected ? 'Detected' : 'None'}
-                            </TableCell>
-                            <TableCell align="right">
-                              {prediction.anomaly_detected ? (
-                                <WarningAmber color="warning" fontSize="small" />
-                              ) : (
-                                <CheckCircle color="success" fontSize="small" />
-                              )}
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell component="th" scope="row">
-                              Maintenance Status
-                            </TableCell>
-                            <TableCell align="right">
-                              {prediction.failure_probability > 0.5 ? 'Required' : 'Not Required'}
-                            </TableCell>
-                            <TableCell align="right">
-                              {prediction.failure_probability > 0.5 ? (
-                                <ErrorIcon color="error" fontSize="small" />
-                              ) : (
-                                <CheckCircle color="success" fontSize="small" />
-                              )}
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell component="th" scope="row">
-                              Next Maintenance
-                            </TableCell>
-                            <TableCell align="right" colSpan={2}>
-                              {prediction.next_maintenance_date ? 
-                                formatDate(prediction.next_maintenance_date) : 
-                                'Not scheduled'}
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Grid>
-                </Grid>
-              </Paper>
+                          </motion.div>
+                        )}
+                      </motion.div>
+                    )}
+                  </Paper>
+                </ScrollAnimationWrapper>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Paper sx={{ p: 4, textAlign: 'center', height: '100%' }}>
+                  <Typography variant="h6">
+                    Select a machine from the list to view real-time data
+                  </Typography>
+                </Paper>
+              </motion.div>
             )}
-          </>
-        ) : (
-          <Paper sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="h6" color="text.secondary">
-              Select equipment to view real-time data
-            </Typography>
-          </Paper>
-        )}
+          </AnimatePresence>
+        </Grid>
       </Grid>
-    </Grid>
+    </motion.div>
   );
 };
 

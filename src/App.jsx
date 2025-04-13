@@ -39,7 +39,11 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableRow
+  TableRow,
+  Avatar,
+  Badge,
+  Menu,
+  Tooltip
 } from '@mui/material';
 import { 
   BarChart, 
@@ -49,7 +53,7 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip, 
+  Tooltip as RechartsTooltip, 
   Legend, 
   ResponsiveContainer,
   PieChart,
@@ -69,6 +73,7 @@ import {
   saveModelSettings,
   trainModel,
 } from './services/api';
+import { motion, AnimatePresence } from 'framer-motion';
 import DataUploader from './components/DataUploader';
 import SensorVisualizer from './components/SensorVisualizer';
 import PredictionResult from './components/PredictionResult';
@@ -78,7 +83,17 @@ import MaintenanceScheduler from './components/MaintenanceScheduler';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import UserProfile from './components/UserProfile';
+import { fadeIn, slideUp, fadeInUp } from './utils/animations';
 import './App.css'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import MonitorIcon from '@mui/icons-material/Monitor';
+import BuildIcon from '@mui/icons-material/Build';
+import PersonIcon from '@mui/icons-material/Person';
+import LogoutIcon from '@mui/icons-material/Logout';
+import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 // Create a theme
 const theme = createTheme({
@@ -207,6 +222,36 @@ function App() {
   const [reliabilityData, setReliabilityData] = useState(null);
   const [featureImportance, setFeatureImportance] = useState([]);
   
+  // Page change animation variants
+  const pageVariants = {
+    initial: {
+      opacity: 0,
+      y: 20
+    },
+    animate: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.4,
+        ease: "easeInOut"
+      }
+    },
+    exit: {
+      opacity: 0,
+      y: -20,
+      transition: {
+        duration: 0.3
+      }
+    }
+  };
+
+  // Tab change animation variants
+  const tabVariants = {
+    initial: { opacity: 0 },
+    animate: { opacity: 1, transition: { duration: 0.5 } },
+    exit: { opacity: 0, transition: { duration: 0.3 } }
+  };
+
   // Fetch data from API
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -220,19 +265,35 @@ function App() {
         const machinesData = await getMachines();
         setMachines(machinesData);
         
+        // Check if we have any machines
         if (machinesData && machinesData.length > 0) {
-          const selectedEquipmentId = machinesData[0].equipment_id;
-          setSelectedMachine(selectedEquipmentId);
+          // Select the first machine
+          const firstMachine = machinesData[0];
+          setSelectedMachine(firstMachine);
           
-          // Only fetch details and readings if we have a valid equipment ID
-          if (selectedEquipmentId) {
-            // Fetch machine details
-            const details = await getMachineDetails(selectedEquipmentId);
+          // Fetch sensor data for the selected machine
+          const rawSensorData = await getMachineReadings(firstMachine.equipment_id);
+          
+          // Format data for the chart
+          const formattedData = rawSensorData.map(reading => {
+            // Format timestamp for display
+            const date = new Date(reading.timestamp);
+            const formattedTime = date.toLocaleTimeString();
             
-            // Fetch sensor data
-            const sensorData = await getMachineReadings(selectedEquipmentId);
-            setSensorData(sensorData);
-          }
+            // Make sure all needed properties exist
+            return {
+              ...reading,
+              name: formattedTime,
+              // Ensure all sensor types have at least a default value
+              temperature: reading.temperature || 0,
+              vibration: reading.vibration || 0,
+              pressure: reading.pressure || 0,
+              oil_level: reading.oil_level || 0
+            };
+          });
+          
+          console.log("Initial sensor data:", formattedData);
+          setSensorData(formattedData);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -300,7 +361,7 @@ function App() {
     try {
       setPredictLoading(true);
       // Get latest sensor data for this machine
-      const latestReading = await getMachineReadings(selectedMachine, { limit: 1 });
+      const latestReading = await getMachineReadings(selectedMachine.equipment_id, { limit: 1 });
       
       if (!latestReading || latestReading.length === 0) {
         setError({
@@ -317,7 +378,7 @@ function App() {
       
       const predictionInput = {
         timestamp: reading.timestamp,
-        equipment_id: selectedMachine,
+        equipment_id: selectedMachine.equipment_id,
         readings: {
           // Include all available sensor readings - these will be used by the ML model
           temperature: reading.temperature,
@@ -419,18 +480,66 @@ function App() {
   const handleMachineSelect = async (machineId) => {
     try {
       setLoading(true);
-      setSelectedMachine(machineId);
       
-      // Fetch machine details
-      const details = await getMachineDetails(machineId);
+      // Find the machine object from the machines array
+      const machine = machines.find(m => m.equipment_id === machineId);
+      
+      if (!machine) {
+        console.error(`Machine with ID ${machineId} not found in machines list`);
+        setError({
+          severity: 'error',
+          message: 'Selected machine not found'
+        });
+        setLoading(false);
+        return;
+      }
+      
+      console.log(`Selected machine: ${machine.name} (${machine.equipment_id})`);
+      
+      // Set the full machine object, not just the ID
+      setSelectedMachine(machine);
       
       // Fetch sensor data for the selected machine
-      const sensorData = await getMachineReadings(machineId);
-      setSensorData(sensorData);
+      console.log(`Fetching sensor data for ${machine.equipment_id}`);
+      const rawSensorData = await getMachineReadings(machineId);
+      console.log(`Received ${rawSensorData?.length || 0} sensor readings`);
+      
+      if (!rawSensorData || !Array.isArray(rawSensorData) || rawSensorData.length === 0) {
+        console.warn(`No sensor data available for ${machine.equipment_id}`);
+        setSensorData([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Format data for the chart
+      const formattedData = rawSensorData.map(reading => {
+        // Format timestamp for display
+        let formattedTime = 'Unknown';
+        try {
+          const date = new Date(reading.timestamp);
+          formattedTime = isNaN(date.getTime()) ? 'Invalid time' : date.toLocaleTimeString();
+        } catch (err) {
+          console.error('Error formatting timestamp:', err);
+        }
+        
+        // Make sure all needed properties exist
+        return {
+          ...reading,
+          name: formattedTime,
+          // Ensure all sensor types have at least a default value
+          temperature: typeof reading.temperature === 'number' ? reading.temperature : 0,
+          vibration: typeof reading.vibration === 'number' ? reading.vibration : 0,
+          pressure: typeof reading.pressure === 'number' ? reading.pressure : 0,
+          oil_level: typeof reading.oil_level === 'number' ? reading.oil_level : 0
+        };
+      });
+      
+      console.log(`Formatted ${formattedData.length} sensor readings for display`);
+      console.log("Sensor data sample:", formattedData[0]);
+      setSensorData(formattedData);
       
       // Clear previous prediction results
       setPredictionResult(null);
-      setTabValue(0);
       
     } catch (error) {
       console.error('Error fetching machine data:', error);
@@ -438,6 +547,7 @@ function App() {
         severity: 'error',
         message: `Failed to load machine data: ${error.message || 'Unknown error'}`
       });
+      setSensorData([]);
     } finally {
       setLoading(false);
     }
@@ -469,551 +579,462 @@ function App() {
     setAuthView('login');
   };
 
-  // If not authenticated, show login/signup
-  if (!isAuthenticated) {
-    return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <Container>
-          {authView === 'login' ? (
-            <Login onLogin={handleLogin} onSwitchToSignup={() => handleAuthViewChange('signup')} />
-          ) : (
-            <Signup onSignup={handleSignup} onSwitchToLogin={() => handleAuthViewChange('login')} />
-          )}
-        </Container>
-      </ThemeProvider>
-    );
-  }
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-        <AppBar position="static" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-          <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 0, display: 'flex', alignItems: 'center' }}>
-              <svg style={{ width: 28, height: 28, marginRight: 8 }} viewBox="0 0 24 24">
-                <path fill="currentColor" d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6M12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8M12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12A2,2 0 0,1 12,10Z" />
-              </svg>
-              Predictive Maintenance
-            </Typography>
-            
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button 
-                color="inherit" 
-                onClick={() => handleViewChange('dashboard')}
-                sx={{ 
-                  fontWeight: currentView === 'dashboard' ? 'bold' : 'normal',
-                  borderBottom: currentView === 'dashboard' ? `2px solid ${theme.palette.primary.contrastText}` : 'none',
-                  borderRadius: 0,
-                  px: 2
-                }}
-              >
-                Dashboard
-              </Button>
-              <Button 
-                color="inherit" 
-                onClick={() => handleViewChange('monitor')}
-                sx={{ 
-                  fontWeight: currentView === 'monitor' ? 'bold' : 'normal',
-                  borderBottom: currentView === 'monitor' ? `2px solid ${theme.palette.primary.contrastText}` : 'none',
-                  borderRadius: 0,
-                  px: 2
-                }}
-              >
-                Real-Time Monitor
-              </Button>
-              <Button 
-                color="inherit" 
-                onClick={() => handleViewChange('maintenance')}
-                sx={{ 
-                  fontWeight: currentView === 'maintenance' ? 'bold' : 'normal',
-                  borderBottom: currentView === 'maintenance' ? `2px solid ${theme.palette.primary.contrastText}` : 'none',
-                  borderRadius: 0,
-                  px: 2
-                }}
-              >
-                Maintenance
-              </Button>
-              <Button 
-                color="inherit" 
-                onClick={() => handleViewChange('analytics')}
-                sx={{ 
-                  fontWeight: currentView === 'analytics' ? 'bold' : 'normal',
-                  borderBottom: currentView === 'analytics' ? `2px solid ${theme.palette.primary.contrastText}` : 'none',
-                  borderRadius: 0,
-                  px: 2
-                }}
-              >
-                Analytics
-              </Button>
-              <Button 
-                color="inherit" 
-                onClick={() => handleViewChange('profile')}
-                sx={{ 
-                  fontWeight: currentView === 'profile' ? 'bold' : 'normal',
-                  borderBottom: currentView === 'profile' ? `2px solid ${theme.palette.primary.contrastText}` : 'none',
-                  borderRadius: 0,
-                  px: 2
-                }}
-              >
-                Profile
-              </Button>
-              <Button 
-                color="inherit"
-                variant="outlined"
-                onClick={handleLogout}
-                sx={{ ml: 2 }}
-              >
-                Logout
-              </Button>
-            </Box>
-          </Toolbar>
-        </AppBar>
-
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
-          {error && (
-            <Alert 
-              severity={error.severity || 'error'} 
-              sx={{ mb: 2 }}
-              onClose={() => setError(null)}
+      <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        {isAuthenticated ? (
+          <>
+            <AppBar 
+              position="sticky" 
+              color="primary" 
+              elevation={4} 
+              sx={{ 
+                background: 'linear-gradient(90deg, #5a3944 0%, #714955 100%)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+              }}
             >
-              {error.message}
-            </Alert>
-          )}
-          
-          {/* Dashboard View */}
-          {currentView === 'dashboard' && (
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={5} lg={4}>
-                <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  <Typography component="h2" variant="h6" color="primary" gutterBottom>
-                    Equipment Status
+              <Toolbar sx={{ minHeight: '70px' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+                  <PrecisionManufacturingIcon sx={{ mr: 1, fontSize: 28 }} />
+                  <Typography 
+                    variant="h5" 
+                    component="div" 
+                    sx={{ 
+                      flexGrow: 1, 
+                      fontWeight: 600,
+                      letterSpacing: '0.5px',
+                      display: { xs: 'none', sm: 'block' }
+                    }}
+                  >
+                    Predictify
                   </Typography>
-                  
-                  {loading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
-                      <CircularProgress />
-                    </Box>
-                  ) : (
-                    <>
-                      {machines.length > 0 ? (
-                        <Box sx={{ 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          gap: 1.5,
-                          mt: 1,
-                          flexGrow: 1,
-                          overflow: 'auto',
-                          maxHeight: 400
-                        }}>
-                          {machines.map((machine) => (
-                            <Paper 
-                              key={machine.equipment_id}
-                              elevation={1}
-                              sx={{ 
-                                p: 1.5, 
-                                display: 'flex', 
-                                flexDirection: 'column',
-                                cursor: 'pointer',
-                                bgcolor: selectedMachine === machine.equipment_id ? 'primary.light' : 'background.paper',
-                                color: selectedMachine === machine.equipment_id ? 'primary.contrastText' : 'text.primary',
-                                '&:hover': {
-                                  bgcolor: selectedMachine === machine.equipment_id ? 'primary.light' : 'action.hover',
-                                },
-                              }}
-                              onClick={() => handleMachineSelect(machine.equipment_id)}
-                            >
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'medium' }}>
-                                  {machine.name}
-                                </Typography>
-                                <Chip 
-                                  size="small" 
-                                  label={machine.status} 
-                                  color="primary"
-                                  sx={{ 
-                                    fontWeight: 'medium',
-                                    borderRadius: 1,
-                                  }}
-                                />
-                              </Box>
-                              <Typography variant="body2" color={selectedMachine === machine.equipment_id ? 'primary.contrastText' : 'text.secondary'}>
-                                Last Maintenance: {new Date(machine.last_maintenance).toLocaleDateString()}
-                              </Typography>
-                              <Typography variant="body2" color={selectedMachine === machine.equipment_id ? 'primary.contrastText' : 'text.secondary'}>
-                                Location: {machine.location}
-                              </Typography>
-                            </Paper>
-                          ))}
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary" sx={{ my: 2 }}>
-                          No equipment found. Add equipment through the management section.
-                        </Typography>
-                      )}
-                    </>
-                  )}
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} md={7} lg={8}>
-                <Paper sx={{ p: 2 }}>
-                  <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                    <Tabs 
-                      value={tabValue} 
-                      onChange={handleTabChange} 
-                      aria-label="data analysis tabs"
-                      TabIndicatorProps={{
-                        style: {
-                          backgroundColor: theme.palette.primary.main,
-                        }
-                      }}
+                </Box>
+                
+                <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
+                  <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
+                    <Button 
+                      color="inherit" 
+                      onClick={() => setCurrentView('dashboard')}
+                      variant={currentView === 'dashboard' ? 'contained' : 'text'}
+                      startIcon={<DashboardIcon />}
                       sx={{ 
-                        '& .MuiTabs-indicator': { height: 3 },
-                        '& .MuiTabs-flexContainer button': { 
-                          borderRight: 'none' 
-                        },
-                        '& .MuiTabs-root': { 
-                          '&::after': { 
-                            display: 'none' 
-                          },
-                          '&:focus': {
-                            outline: 'none',
-                            '&::after': { display: 'none' },
-                            '&::before': { display: 'none' }
-                          },
-                          '&.Mui-selected': {
-                            '&::after': { display: 'none' }
-                          }
+                        mx: 1, 
+                        px: 2,
+                        borderRadius: '20px',
+                        backgroundColor: currentView === 'dashboard' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                        '&:hover': {
+                          backgroundColor: currentView === 'dashboard' ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)'
                         }
                       }}
                     >
-                      <Tab label="Data Analysis" id="tab-0" disableRipple />
-                      <Tab label="Prediction Results" id="tab-1" disableRipple />
-                      <Tab label="Data Management" id="tab-2" disableRipple />
-                    </Tabs>
-                  </Box>
-
-                  {/* Data Analysis Tab */}
-                  <TabPanel value={tabValue} index={0}>
-                    <Grid container spacing={3}>
-                      <Grid item xs={12}>
-                        <SensorVisualizer 
-                          data={sensorData} 
-                          isLoading={loading}
-                          selectedMachine={selectedMachine} 
-                        />
-                      </Grid>
-                      <Grid item xs={12} sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-                        <Button 
-                          variant="contained" 
-                          color="primary" 
-                          onClick={handleRunPrediction}
-                          disabled={!selectedMachine || loading || predictLoading}
-                        >
-                          {predictLoading ? <CircularProgress size={24} /> : 'Run Prediction'}
-                        </Button>
-                      </Grid>
-                    </Grid>
-                  </TabPanel>
-
-                  {/* Prediction Results Tab */}
-                  <TabPanel value={tabValue} index={1}>
-                    {predictionResult ? (
-                      <PredictionResult
-                        result={predictionResult}
-                        onScheduleMaintenance={handleScheduleMaintenance}
-                      />
-                    ) : (
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
-                        <Typography variant="body1" color="text.secondary" gutterBottom>
-                          No prediction results available.
-                        </Typography>
-                        <Button 
-                          variant="contained" 
-                          color="primary"
-                          onClick={() => setTabValue(0)}
-                          sx={{ mt: 2 }}
-                        >
-                          Go to Data Analysis
-                        </Button>
-                      </Box>
-                    )}
-                  </TabPanel>
-
-                  {/* Data Management Tab */}
-                  <TabPanel value={tabValue} index={2}>
-                    <Grid container spacing={3}>
-                      <Grid item xs={12} md={6}>
-                        <DataUploader />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <ConnectorManager />
-                      </Grid>
-                    </Grid>
-                  </TabPanel>
-                </Paper>
-              </Grid>
-            </Grid>
-          )}
-
-          {/* Real-Time Monitor View */}
-          {currentView === 'monitor' && (
-            <RealTimeMonitor />
-          )}
-          
-          {/* Maintenance Scheduler View */}
-          {currentView === 'maintenance' && (
-            <MaintenanceScheduler />
-          )}
-
-          {/* Analytics View */}
-          {currentView === 'analytics' && (
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={8}>
-                <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography component="h2" variant="h6" color="primary" gutterBottom sx={{ mb: 0 }}>
-                      Comparative Analysis
-                    </Typography>
-                    <FormControl variant="outlined" size="small" sx={{ minWidth: 150 }}>
-                      <InputLabel id="metric-select-label">Metric</InputLabel>
-                      <Select
-                        labelId="metric-select-label"
-                        id="metric-select"
-                        value={analyticsMetric}
-                        onChange={(e) => setAnalyticsMetric(e.target.value)}
-                        label="Metric"
-                      >
-                        <MenuItem value="temperature">Temperature</MenuItem>
-                        <MenuItem value="vibration">Vibration</MenuItem>
-                        <MenuItem value="pressure">Pressure</MenuItem>
-                        <MenuItem value="oil_level">Oil Level</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Box>
+                      Dashboard
+                    </Button>
+                  </motion.div>
+                  <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
+                    <Button 
+                      color="inherit" 
+                      onClick={() => setCurrentView('realtime')}
+                      variant={currentView === 'realtime' ? 'contained' : 'text'}
+                      startIcon={<MonitorIcon />}
+                      sx={{ 
+                        mx: 1, 
+                        px: 2,
+                        borderRadius: '20px',
+                        backgroundColor: currentView === 'realtime' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                        '&:hover': {
+                          backgroundColor: currentView === 'realtime' ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)'
+                        }
+                      }}
+                    >
+                      Monitor
+                    </Button>
+                  </motion.div>
+                  <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
+                    <Button 
+                      color="inherit" 
+                      onClick={() => setCurrentView('maintenance')}
+                      variant={currentView === 'maintenance' ? 'contained' : 'text'}
+                      startIcon={<BuildIcon />}
+                      sx={{ 
+                        mx: 1, 
+                        px: 2,
+                        borderRadius: '20px',
+                        backgroundColor: currentView === 'maintenance' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                        '&:hover': {
+                          backgroundColor: currentView === 'maintenance' ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)'
+                        }
+                      }}
+                    >
+                      Maintenance
+                    </Button>
+                  </motion.div>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Tooltip title="Notifications">
+                    <IconButton color="inherit" sx={{ mx: 1 }}>
+                      <Badge badgeContent={3} color="error">
+                        <NotificationsIcon />
+                      </Badge>
+                    </IconButton>
+                  </Tooltip>
                   
-                  {loadingAnalytics ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
-                      <CircularProgress />
-                    </Box>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart
-                        data={comparativeData}
-                        margin={{
-                          top: 5,
-                          right: 30,
-                          left: 20,
-                          bottom: 5,
-                        }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Line type="monotone" dataKey="current" stroke={theme.palette.primary.main} name="Current Machine" strokeWidth={2} />
-                        <Line type="monotone" dataKey="average" stroke={theme.palette.info.main} name="Fleet Average" strokeWidth={2} />
-                        <Line type="monotone" dataKey="optimal" stroke={theme.palette.success.main} name="Optimal Range" strokeDasharray="5 5" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  )}
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} md={4}>
-                <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  <Typography component="h2" variant="h6" color="primary" gutterBottom>
-                    Maintenance ROI
-                  </Typography>
-                  {loadingAnalytics ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
-                      <CircularProgress />
-                    </Box>
-                  ) : roiData ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'Cost Savings', value: roiData.cost_savings },
-                            { name: 'Investment', value: roiData.investment },
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={true}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          <Cell fill={theme.palette.success.main} />
-                          <Cell fill={theme.palette.primary.main} />
-                        </Pie>
-                        <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary" sx={{ my: 2 }}>
-                      No ROI data available.
-                    </Typography>
-                  )}
+                  <Tooltip title="Settings">
+                    <IconButton color="inherit" sx={{ mx: 1 }}>
+                      <SettingsIcon />
+                    </IconButton>
+                  </Tooltip>
                   
-                  {roiData && (
-                    <Box sx={{ mt: 'auto', pt: 2 }}>
-                      <Typography variant="body2" gutterBottom>
-                        ROI: <strong>{roiData.roi}%</strong>
-                      </Typography>
-                      <Typography variant="body2">
-                        Downtime Prevented: <strong>{roiData.downtime_prevented} hours</strong>
-                      </Typography>
-                    </Box>
-                  )}
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 2, height: '100%' }}>
-                  <Typography component="h2" variant="h6" color="primary" gutterBottom>
-                    Feature Importance
-                  </Typography>
-                  {loadingAnalytics ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
-                      <CircularProgress />
-                    </Box>
-                  ) : featureImportance.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart
-                        data={featureImportance}
-                        layout="vertical"
-                        margin={{
-                          top: 5,
-                          right: 30,
-                          left: 100,
-                          bottom: 5,
-                        }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" domain={[0, 1]} />
-                        <YAxis dataKey="name" type="category" />
-                        <Tooltip formatter={(value) => `${(value * 100).toFixed(1)}%`} />
-                        <Bar dataKey="value" fill={theme.palette.primary.main} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary" sx={{ my: 2 }}>
-                      No feature importance data available.
-                    </Typography>
-                  )}
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 2, height: '100%' }}>
-                  <Typography component="h2" variant="h6" color="primary" gutterBottom>
-                    Reliability Metrics
-                  </Typography>
-                  {loadingAnalytics ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
-                      <CircularProgress />
-                    </Box>
-                  ) : reliabilityData ? (
-                    <Box sx={{ mt: 2 }}>
-                      <Grid container spacing={3}>
-                        <Grid item xs={12} md={4}>
-                          <Paper
-                            elevation={1}
-                            sx={{
-                              p: 2,
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              bgcolor: 'primary.light',
-                              color: 'primary.contrastText',
-                            }}
-                          >
-                            <Typography variant="h6" component="div" sx={{ mb: 1 }}>
-                              {reliabilityData.availability}%
-                            </Typography>
-                            <Typography variant="body2">Availability</Typography>
-                          </Paper>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                          <Paper
-                            elevation={1}
-                            sx={{
-                              p: 2,
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              bgcolor: 'info.light',
-                              color: 'info.contrastText',
-                            }}
-                          >
-                            <Typography variant="h6" component="div" sx={{ mb: 1 }}>
-                              {reliabilityData.mtbf} hrs
-                            </Typography>
-                            <Typography variant="body2">MTBF</Typography>
-                          </Paper>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                          <Paper
-                            elevation={1}
-                            sx={{
-                              p: 2,
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              bgcolor: 'warning.light',
-                              color: 'warning.contrastText',
-                            }}
-                          >
-                            <Typography variant="h6" component="div" sx={{ mb: 1 }}>
-                              {reliabilityData.mttr} hrs
-                            </Typography>
-                            <Typography variant="body2">MTTR</Typography>
-                          </Paper>
-                        </Grid>
-                      </Grid>
-                      
-                      <Typography component="h3" variant="subtitle1" sx={{ mt: 3, mb: 2 }}>
-                        Reliability Trend
-                      </Typography>
-                      
-                      <ResponsiveContainer width="100%" height={180}>
-                        <LineChart
-                          data={reliabilityData.trend}
-                          margin={{
-                            top: 5,
-                            right: 30,
-                            left: 20,
-                            bottom: 5,
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      color="inherit"
+                      onClick={() => setCurrentView('profile')}
+                      startIcon={
+                        <Avatar 
+                          sx={{ 
+                            width: 32, 
+                            height: 32,
+                            bgcolor: currentView === 'profile' ? 'primary.dark' : 'rgba(255, 255, 255, 0.2)',
+                            border: '2px solid rgba(255, 255, 255, 0.8)'
                           }}
                         >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis domain={[0, 100]} />
-                          <Tooltip formatter={(value) => `${value}%`} />
-                          <Line type="monotone" dataKey="value" stroke={theme.palette.primary.main} strokeWidth={2} />
-                        </LineChart>
-                      </ResponsiveContainer>
+                          <PersonIcon sx={{ fontSize: 18 }} />
+                        </Avatar>
+                      }
+                      sx={{ 
+                        ml: 1,
+                        borderRadius: '20px', 
+                        px: 2, 
+                        textTransform: 'none',
+                        backgroundColor: currentView === 'profile' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                        '&:hover': {
+                          backgroundColor: currentView === 'profile' ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)'
+                        }
+                      }}
+                    >
+                      Profile
+                    </Button>
+                  </motion.div>
+                  
+                  <Divider orientation="vertical" flexItem sx={{ mx: 2, backgroundColor: 'rgba(255,255,255,0.3)' }} />
+                  
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button 
+                      variant="outlined"
+                      color="inherit" 
+                      onClick={handleLogout}
+                      startIcon={<LogoutIcon />}
+                      sx={{ 
+                        borderColor: 'rgba(255,255,255,0.5)',
+                        borderRadius: '20px',
+                        '&:hover': {
+                          borderColor: 'rgba(255,255,255,0.8)',
+                          backgroundColor: 'rgba(255,255,255,0.1)'
+                        }
+                      }}
+                    >
+                      Logout
+                    </Button>
+                  </motion.div>
+                </Box>
+              </Toolbar>
+            </AppBar>
+            
+            <Container maxWidth="xl" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentView}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  variants={pageVariants}
+                >
+                  {currentView === 'dashboard' && (
+                    <Box>
+                      {error && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <Alert severity="error" sx={{ mb: 2 }}>{error.message}</Alert>
+                        </motion.div>
+                      )}
+                      
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.1 }}
+                      >
+                        <Grid container spacing={3}>
+                          {/* Equipment Status */}
+                          <Grid item xs={12} md={8}>
+                            <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
+                              <Typography variant="h6" gutterBottom component="div">
+                                Equipment Status
+                              </Typography>
+                              {loading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                                  <motion.div 
+                                    animate={{ 
+                                      rotate: 360,
+                                      transition: { duration: 2, repeat: Infinity, ease: "linear" }
+                                    }}
+                                  >
+                                    <CircularProgress />
+                                  </motion.div>
+                                </Box>
+                              ) : (
+                                <motion.div
+                                  variants={fadeIn}
+                                  initial="hidden"
+                                  animate="visible"
+                                  style={{ opacity: 1 }}
+                                >
+                                  <Grid container spacing={2}>
+                                    {machines.map((machine, index) => (
+                                      <Grid item xs={12} sm={6} md={4} key={machine.equipment_id}>
+                                        <motion.div 
+                                          variants={fadeInUp}
+                                          custom={index * 0.1}
+                                          whileHover={{ 
+                                            y: -5, 
+                                            transition: { duration: 0.2 },
+                                            boxShadow: "0px 10px 20px rgba(0, 0, 0, 0.1)"
+                                          }}
+                                          style={{ opacity: 1 }}
+                                        >
+                                          <Paper 
+                                            elevation={selectedMachine?.equipment_id === machine.equipment_id ? 3 : 1}
+                                            sx={{ 
+                                              p: 2, 
+                                              cursor: 'pointer',
+                                              height: '100%',
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              borderLeft: selectedMachine?.equipment_id === machine.equipment_id ? '4px solid #714955' : 'none',
+                                              opacity: 1,
+                                            }}
+                                            onClick={() => handleMachineSelect(machine.equipment_id)}
+                                          >
+                                            <Typography variant="h6" component="h3">
+                                              {machine.name}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                              {machine.type} - {machine.model}
+                                            </Typography>
+                                            <Box sx={{ mt: 'auto', pt: 1, display: 'flex', justifyContent: 'space-between' }}>
+                                              <Typography variant="body2">
+                                                Last Maintenance:
+                                              </Typography>
+                                              <Typography variant="body2" color="text.secondary">
+                                                {machine.last_maintenance_date ? 
+                                                  new Date(machine.last_maintenance_date).toLocaleDateString() : 
+                                                  'Never'}
+                                              </Typography>
+                                            </Box>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                              <Typography variant="body2">
+                                                Location:
+                                              </Typography>
+                                              <Typography variant="body2" color="text.secondary">
+                                                {machine.location || 'Unknown'}
+                                              </Typography>
+                                            </Box>
+                                          </Paper>
+                                        </motion.div>
+                                      </Grid>
+                                    ))}
+                                  </Grid>
+                                </motion.div>
+                              )}
+                            </Paper>
+                          </Grid>
+                          
+                          {/* Recent Alerts */}
+                          <Grid item xs={12} md={4}>
+                            <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                              <Typography variant="h6" gutterBottom component="div">
+                                Recent Alerts
+                              </Typography>
+                              
+                              {/* Add alerts here */}
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, flex: 1 }}>
+                                {/* Placeholder content when no alerts are available */}
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  flexDirection: 'column', 
+                                  alignItems: 'center',
+                                  justifyContent: 'center', 
+                                  textAlign: 'center',
+                                  py: 3,
+                                  height: '100%'
+                                }}>
+                                  <Box sx={{ 
+                                    bgcolor: 'background.paper', 
+                                    p: 2, 
+                                    borderRadius: 1,
+                                    width: '100%',
+                                    mb: 2
+                                  }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                      <CheckCircleIcon color="success" sx={{ mr: 1 }} />
+                                      <Typography variant="body1" color="text.primary">
+                                        All systems operating normally
+                                      </Typography>
+                                    </Box>
+                                    <Typography variant="body2" color="text.secondary">
+                                      No active alerts at this time
+                                    </Typography>
+                                  </Box>
+                                  
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    Alerts will appear here when equipment requires attention
+                                  </Typography>
+                                  
+                                  <Button 
+                                    size="small" 
+                                    startIcon={<NotificationsIcon />}
+                                    variant="outlined"
+                                    sx={{ mt: 1 }}
+                                  >
+                                    Configure Alert Settings
+                                  </Button>
+                                </Box>
+                              </Box>
+                            </Paper>
+                          </Grid>
+                          
+                          {/* Data Tabs */}
+                          <Grid item xs={12}>
+                            <Paper sx={{ width: '100%' }}>
+                              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                                <Tabs 
+                                  value={tabValue} 
+                                  onChange={handleTabChange} 
+                                  aria-label="data tabs"
+                                  variant="scrollable"
+                                  scrollButtons="auto"
+                                >
+                                  <Tab label="Data Analysis" />
+                                  <Tab label="Prediction Results" />
+                                  <Tab label="Data Management" />
+                                </Tabs>
+                              </Box>
+                              
+                              <AnimatePresence mode="wait">
+                                <motion.div
+                                  key={tabValue}
+                                  initial="initial"
+                                  animate="animate"
+                                  exit="exit"
+                                  variants={tabVariants}
+                                >
+                                  <TabPanel value={tabValue} index={0}>
+                                    <Grid container spacing={3}>
+                                      <Grid item xs={12}>
+                                        <SensorVisualizer 
+                                          data={sensorData} 
+                                          isLoading={loading} 
+                                          selectedMachine={selectedMachine?.name}
+                                        />
+                                      </Grid>
+                                      <Grid item xs={12} sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                                          <Button
+                                            variant="contained"
+                                            color="primary"
+                                            onClick={handleRunPrediction}
+                                            disabled={!selectedMachine || predictLoading}
+                                            startIcon={predictLoading ? <CircularProgress size={24} color="inherit" /> : null}
+                                          >
+                                            {predictLoading ? 'Running Prediction...' : 'Run Prediction'}
+                                          </Button>
+                                        </motion.div>
+                                      </Grid>
+                                    </Grid>
+                                  </TabPanel>
+                                  
+                                  <TabPanel value={tabValue} index={1}>
+                                    <Grid container spacing={3}>
+                                      <Grid item xs={12}>
+                                        <PredictionResult 
+                                          predictionResult={predictionResult}
+                                          isLoading={predictLoading}
+                                        />
+                                      </Grid>
+                                      {!predictionResult && !predictLoading && (
+                                        <Grid item xs={12} sx={{ mt: 2, textAlign: 'center' }}>
+                                          <Alert severity="info" sx={{ maxWidth: 600, mx: 'auto' }}>
+                                            No prediction results yet. Go to the Data Analysis tab to run a prediction.
+                                          </Alert>
+                                        </Grid>
+                                      )}
+                                    </Grid>
+                                  </TabPanel>
+                                  
+                                  <TabPanel value={tabValue} index={2}>
+                                    <Grid container spacing={3}>
+                                      <Grid item xs={12} md={6}>
+                                        <DataUploader />
+                                      </Grid>
+                                      <Grid item xs={12} md={6}>
+                                        <ConnectorManager />
+                                      </Grid>
+                                    </Grid>
+                                  </TabPanel>
+                                </motion.div>
+                              </AnimatePresence>
+                            </Paper>
+                          </Grid>
+                        </Grid>
+                      </motion.div>
                     </Box>
+                  )}
+                  
+                  {currentView === 'realtime' && (
+                    <RealTimeMonitor />
+                  )}
+                  
+                  {currentView === 'maintenance' && (
+                    <MaintenanceScheduler />
+                  )}
+                  
+                  {currentView === 'profile' && (
+                    <UserProfile user={currentUser} />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </Container>
+          </>
+        ) : (
+          <Container maxWidth="sm" sx={{ mt: 8 }}>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={authView}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+              >
+                <Paper sx={{ p: 4, borderRadius: 2, boxShadow: 3 }}>
+                  {authView === 'login' ? (
+                    <Login 
+                      onLogin={handleLogin}
+                      onViewChange={() => handleAuthViewChange('signup')}
+                    />
                   ) : (
-                    <Typography variant="body2" color="text.secondary" sx={{ my: 2 }}>
-                      No reliability data available.
-                    </Typography>
+                    <Signup 
+                      onSignup={handleSignup}
+                      onViewChange={() => handleAuthViewChange('login')}
+                    />
                   )}
                 </Paper>
-              </Grid>
-            </Grid>
-          )}
-
-          {/* Profile View (replacing Settings) */}
-          {currentView === 'profile' && (
-            <UserProfile user={currentUser} />
-          )}
-        </Container>
+              </motion.div>
+            </AnimatePresence>
+          </Container>
+        )}
       </Box>
     </ThemeProvider>
   );
