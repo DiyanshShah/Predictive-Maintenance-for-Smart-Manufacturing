@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  // eslint-disable-next-line no-unused-vars
   FormHelperText,
   Card,
   CardContent,
@@ -32,6 +33,7 @@ import {
   Refresh as RefreshIcon,
   CloudSync as CloudSyncIcon,
   Stop as StopIcon,
+  // eslint-disable-next-line no-unused-vars
   Delete as DeleteIcon,
   Storage as StorageIcon,
   Cable as CableIcon,
@@ -252,16 +254,6 @@ const ConnectorManager = () => {
     }
   };
 
-  // Get status color
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'running': return 'success';
-      case 'failed': return 'error';
-      case 'stopped': return 'warning';
-      default: return 'info';
-    }
-  };
-  
   return (
     <Paper sx={{ p: 3, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -336,7 +328,6 @@ const ConnectorManager = () => {
           ) : (
             <Grid container spacing={2}>
               {connectors.map((connector) => {
-                const statusColor = getStatusColor(connector.status);
                 const machineName = machines.find(m => m.equipment_id === connector.equipment_id)?.name || connector.equipment_id;
                 
                 return (
@@ -386,7 +377,7 @@ const ConnectorManager = () => {
                           <Chip 
                             label={connector.status} 
                             size="small" 
-                            color={statusColor}
+                            color="primary"
                             sx={{
                               fontWeight: 'medium',
                               '& .MuiChip-label': { textTransform: 'capitalize' }

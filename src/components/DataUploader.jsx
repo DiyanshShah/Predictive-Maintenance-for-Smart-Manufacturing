@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { 
   Box, 
   Button, 
@@ -6,40 +6,26 @@ import {
   Paper, 
   Alert, 
   CircularProgress,
-  LinearProgress
+  LinearProgress,
+  Chip
 } from '@mui/material';
-import { uploadHistoricalData } from '../services/api';
+import { uploadHistoricalData, trainModel } from '../services/api';
+import { UploadFile as UploadFileIcon, CloudUpload as CloudUploadIcon, ModelTraining as ModelTrainingIcon } from '@mui/icons-material';
 
 const DataUploader = () => {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [alert, setAlert] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [trainingTriggered, setTrainingTriggered] = useState(false);
+  const [trainingStatus, setTrainingStatus] = useState(null);
 
   const handleFileChange = (event) => {
-    const selectedFile = event.target.files[0];
-    
-    if (selectedFile) {
-      // Check file type
-      if (!selectedFile.name.endsWith('.csv') && !selectedFile.name.endsWith('.json')) {
-        setAlert({
-          severity: 'error',
-          message: 'Only CSV and JSON files are supported'
-        });
-        return;
-      }
-      
-      // Check file size (max 10MB)
-      if (selectedFile.size > 10 * 1024 * 1024) {
-        setAlert({
-          severity: 'error',
-          message: 'File size must be less than 10MB'
-        });
-        return;
-      }
-      
-      setFile(selectedFile);
-      setAlert(null);
+    if (event.target.files && event.target.files.length > 0) {
+      setFile(event.target.files[0]);
     }
   };
 
@@ -65,6 +51,7 @@ const DataUploader = () => {
       }, 500);
       
       // Upload the file
+      // eslint-disable-next-line no-unused-vars
       const result = await uploadHistoricalData(file);
       
       clearInterval(progressInterval);
@@ -92,72 +79,145 @@ const DataUploader = () => {
     }
   };
 
+  const handleFileUpload = async () => {
+    if (!file) {
+      setUploadError('Please select a file to upload');
+      return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    setUploading(true);
+    setUploadError(null);
+    setUploadSuccess(false);
+    
+    try {
+      // Call uploadHistoricalData API
+      await uploadHistoricalData(formData);
+      
+      setUploadSuccess(true);
+      setTrainingTriggered(false);
+      setFile(null);
+      
+      // Show success message for 5 seconds
+      setTimeout(() => setUploadSuccess(false), 5000);
+    } catch (error) {
+      setUploadError(`Upload failed: ${error.message || 'Unknown error'}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+  
+  const handleTrainModel = async () => {
+    setTrainingTriggered(true);
+    setTrainingStatus('starting');
+    
+    try {
+      await trainModel();
+      setTrainingStatus('success');
+      
+      // Reset status after 5 seconds
+      setTimeout(() => {
+        setTrainingTriggered(false);
+        setTrainingStatus(null);
+      }, 5000);
+    } catch (error) {
+      setTrainingStatus('error');
+      setUploadError(`Model training failed: ${error.message || 'Unknown error'}`);
+    }
+  };
+
   return (
-    <Paper sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Upload Historical Data
-      </Typography>
-      
-      <Typography variant="body2" color="text.secondary" paragraph>
+    <Box>
+      <Typography variant="h6" gutterBottom>Data Uploader</Typography>
+      <Typography variant="body2" paragraph>
         Upload historical sensor data in CSV or JSON format to train the prediction models.
-        The data should include sensor readings and failure indicators.
       </Typography>
       
-      {alert && (
-        <Alert 
-          severity={alert.severity} 
-          sx={{ mb: 2 }}
-          onClose={() => setAlert(null)}
-        >
-          {alert.message}
-        </Alert>
-      )}
-      
-      <Box sx={{ mb: 2 }}>
-        <input
-          accept=".csv,.json"
-          style={{ display: 'none' }}
-          id="upload-file"
-          type="file"
-          onChange={handleFileChange}
-          disabled={isUploading}
-        />
-        <label htmlFor="upload-file">
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <Button
-            variant="outlined"
-            component="span"
-            disabled={isUploading}
+            variant="contained"
+            component="label"
             sx={{ mr: 2 }}
+            disabled={uploading}
+            startIcon={<UploadFileIcon />}
           >
             Select File
+            <input
+              type="file"
+              accept=".csv,.json"
+              hidden
+              onChange={handleFileChange}
+            />
           </Button>
-        </label>
-        
-        <Button
-          variant="contained"
-          onClick={handleUpload}
-          disabled={!file || isUploading}
-          startIcon={isUploading ? <CircularProgress size={20} color="inherit" /> : null}
-        >
-          {isUploading ? 'Uploading...' : 'Upload'}
-        </Button>
-      </Box>
-      
-      {file && (
-        <Typography variant="body2" sx={{ mb: 1 }}>
-          Selected file: {file.name} ({(file.size / 1024).toFixed(1)} KB)
-        </Typography>
-      )}
-      
-      {isUploading && (
-        <Box sx={{ width: '100%', mt: 2 }}>
-          <LinearProgress variant="determinate" value={uploadProgress} />
-          <Typography variant="caption" align="center" sx={{ display: 'block', mt: 1 }}>
-            {uploadProgress}% Uploaded
-          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleFileUpload}
+            disabled={!file || uploading}
+            startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
+          >
+            {uploading ? 'Uploading...' : 'Upload'}
+          </Button>
+          
+          {uploadSuccess && (
+            <Button
+              variant="outlined"
+              color="success"
+              sx={{ ml: 2 }}
+              onClick={handleTrainModel}
+              disabled={trainingTriggered}
+              startIcon={trainingStatus === 'starting' ? <CircularProgress size={20} color="inherit" /> : <ModelTrainingIcon />}
+            >
+              {trainingStatus === 'starting' ? 'Training...' : 'Train Models'}
+            </Button>
+          )}
         </Box>
-      )}
-    </Paper>
+        
+        {file && (
+          <Chip
+            label={file.name}
+            onDelete={() => setFile(null)}
+            color="primary"
+            variant="outlined"
+            sx={{ mb: 2 }}
+          />
+        )}
+        
+        {uploadSuccess && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            File uploaded successfully! {trainingTriggered && trainingStatus === 'success' ? 'Models have been trained with the new data.' : 'Click "Train Models" to update prediction models with this data.'}
+          </Alert>
+        )}
+        
+        {uploadError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {uploadError}
+          </Alert>
+        )}
+        
+        {trainingStatus === 'error' && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Failed to train model. Please try again.
+          </Alert>
+        )}
+        
+        <Typography variant="subtitle2" gutterBottom>
+          Supported Formats
+        </Typography>
+        <Typography variant="body2">
+          • CSV files with headers for sensor readings (temperature, vibration, pressure, etc.)
+        </Typography>
+        <Typography variant="body2">
+          • JSON files with timestamp, equipment_id, and sensor readings
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 2 }}>
+          The file should include historical data with failure indicators to train the model effectively.
+        </Typography>
+      </Paper>
+    </Box>
   );
 };
 

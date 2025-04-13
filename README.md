@@ -1,117 +1,152 @@
 # Predictive Maintenance for Smart Manufacturing
 
-A machine learning application designed to analyze equipment sensor data in real-time to predict potential failures before they occur. It uses anomaly detection and predictive forecasting to minimize downtime and improve factory efficiency.
+A comprehensive predictive maintenance application for industrial equipment that uses machine learning to predict failures and optimize maintenance schedules.
 
 ## Features
 
-- **Anomaly detection in sensor data**: Identify unusual patterns that may indicate equipment issues
-- **Predictive failure algorithms**: Forecast potential failures before they happen
-- **Real-time monitoring dashboard**: Visualize equipment status and sensor data
-- **Maintenance scheduling integration**: Plan maintenance based on predictions
-- **Data visualization and trend analysis**: Understand patterns and make informed decisions
+- Real-time equipment monitoring dashboard
+- Sensor data visualization with customizable charts
+- ML-based predictive maintenance with remaining useful life estimation
+- Maintenance scheduling and tracking
+- Data connector management for various data sources (CSV, API, Modbus, OPC UA)
+- Analytics dashboard with comparative metrics and ROI calculations
+- Settings management for alerts, notifications, and ML model configuration
 
-## Tech Stack
+## Architecture
 
-- **Frontend**: React, Material-UI, Recharts for data visualization
-- **Backend**: Python 3.11, FastAPI
-- **Machine Learning**: scikit-learn, TensorFlow/Keras, pandas, numpy
-- **Data Visualization**: matplotlib, seaborn, plotly
+The application consists of two main components:
+
+1. **Frontend**: React application with Material UI components
+2. **Backend**: FastAPI Python server with machine learning capabilities
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v16+)
-- Python 3.11
-- npm or yarn
+- Node.js (v14+)
+- Python (v3.8+)
+- pip (Python package manager)
 
-### Installation
-
-#### Frontend Setup
-
-1. Clone the repository:
-   ```
-   git clone <repository-url>
-   cd predictive-maintenance
-   ```
-
-2. Install frontend dependencies:
-   ```
-   npm install
-   ```
-
-3. Start the frontend development server:
-   ```
-   npm run dev
-   ```
-
-#### Backend Setup
+### Setting up the Backend
 
 1. Navigate to the backend directory:
-   ```
-   cd backend
-   ```
-
-2. Create a virtual environment and activate it:
-   ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. Install the required Python packages:
-   ```
-   pip install -r requirements.txt
-   ```
-
-4. Start the backend server:
-   ```
-   uvicorn main:app --reload
-   ```
-
-5. Generate sample data (optional):
-   ```
-   python generate_sample_data.py
-   ```
-
-## API Endpoints
-
-- `GET /`: API status
-- `POST /predict`: Run prediction on sensor data
-- `POST /upload-historical-data`: Upload historical data for training
-- `GET /equipment/{equipment_id}/history`: Get equipment history
-
-## Usage
-
-1. Open the application in your browser at `http://localhost:5173/`
-2. Select a machine to monitor
-3. Use the controls to run predictions or schedule maintenance
-4. View sensor data and anomaly detection in real-time
-
-## Project Structure
-
+```bash
+cd backend
 ```
-predictive-maintenance/
-├── backend/               # Python backend
-│   ├── models/            # ML models
-│   │   ├── anomaly_detection.py
-│   │   ├── prediction.py
-│   │   └── data_processor.py
-│   ├── data/              # Sample data
-│   ├── main.py            # FastAPI application
-│   └── requirements.txt   # Python dependencies
-└── src/                   # React frontend
-    ├── assets/            # Static assets
-    ├── components/        # React components
-    ├── services/          # API services
-    ├── App.jsx            # Main application component
-    └── main.jsx           # Entry point
+
+2. Create a virtual environment (optional but recommended):
+```bash
+python -m venv venv
 ```
+
+3. Activate the virtual environment:
+```bash
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+```
+
+4. Install the required dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+5. Generate sample training data:
+```bash
+python sample_data.py
+```
+
+6. Start the backend server:
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+The API will be available at http://localhost:8000. You can access the interactive API documentation at http://localhost:8000/docs.
+
+### Setting up the Frontend
+
+1. In a new terminal, navigate to the project root
+
+2. Install the required dependencies:
+```bash
+npm install
+```
+
+3. Start the development server:
+```bash
+npm start
+```
+
+The frontend application will be available at http://localhost:3000.
+
+## Training a Model with Real Data
+
+### Option 1: Using the UI
+
+1. Start both the backend and frontend servers
+2. Navigate to the "Data Management" tab in the application
+3. Use the "Upload Historical Data" component to upload your CSV or JSON file
+4. Navigate to the "Settings" view
+5. Find the "Model Training" section and click "Train Model"
+
+### Option 2: Using Sample Data
+
+1. Start the backend server
+2. The sample data script has already generated training data in `backend/data/`
+3. Run the model training endpoint directly:
+```bash
+curl -X POST http://localhost:8000/api/model/train
+```
+
+### Data Format Requirements
+
+Your CSV or JSON training data should include the following columns:
+- `timestamp`: Date and time of the reading
+- `equipment_id`: Unique identifier for the equipment
+- `temperature`: Temperature reading
+- `vibration`: Vibration reading
+- `pressure`: Pressure reading
+- `oil_level`: Oil level reading
+- `is_failure`: Binary indicator (0/1) of whether a failure occurred
+
+Example:
+```
+timestamp,equipment_id,temperature,vibration,pressure,oil_level,is_failure
+2023-01-01T12:00:00,EQ001,72.5,3.2,102.1,95.0,0
+2023-01-01T13:00:00,EQ001,74.1,3.4,103.2,94.5,0
+2023-01-01T14:00:00,EQ001,78.3,4.1,105.5,92.1,0
+...
+2023-01-05T09:00:00,EQ001,92.6,6.8,115.5,65.2,1
+```
+
+## Using the Application
+
+1. **Dashboard**: Monitor equipment status and key metrics
+2. **Equipment Details**: View detailed information and sensor readings for specific equipment
+3. **Prediction**: Run predictions on equipment to estimate failure probability and remaining useful life
+4. **Data Management**: Upload historical data and manage data connectors
+5. **Settings**: Configure alerts, notifications, and model parameters
+
+## Production Deployment
+
+For production deployment:
+
+1. Build the React frontend:
+```bash
+npm run build
+```
+
+2. Deploy the static files to your web server
+
+3. Configure environment variables for the backend:
+```
+DATABASE_URL=your_database_connection_string
+SECRET_KEY=your_secret_key
+```
+
+4. Deploy the backend to a production server with proper security settings
 
 ## License
 
-[MIT License](LICENSE)
-
-## Acknowledgments
-
-- This project is for educational purposes
-- Sample data is artificially generated and doesn't represent real-world equipment
+This project is licensed under the MIT License - see the LICENSE file for details.
