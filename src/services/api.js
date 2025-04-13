@@ -11,6 +11,180 @@ const api = axios.create({
   }
 });
 
+// Authentication helper functions
+const getToken = () => localStorage.getItem('auth_token');
+
+// Add authentication token to all requests if available
+api.interceptors.request.use(config => {
+  const token = getToken();
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+}, error => Promise.reject(error));
+
+// Mock user database for authentication (temporary until backend is connected)
+const userDb = [
+  {
+    id: '1',
+    email: 'admin@example.com',
+    password: 'admin123',
+    firstName: 'Admin',
+    lastName: 'User',
+    role: 'admin'
+  },
+  {
+    id: '2',
+    email: 'engineer@example.com',
+    password: 'engineer123',
+    firstName: 'Maintenance',
+    lastName: 'Engineer',
+    role: 'maintenance'
+  }
+];
+
+// Authentication service
+export const login = async (email, password) => {
+  try {
+    // First try the actual API
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      const { token, user } = response.data;
+      
+      // Store token in localStorage
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      return { success: true, user };
+    } catch (apiError) {
+      console.log('API login failed, using mock authentication');
+      
+      // Mock authentication as fallback
+      const user = userDb.find(u => u.email === email && u.password === password);
+      
+      if (!user) {
+        throw new Error('Invalid email or password');
+      }
+      
+      // Generate mock token
+      const token = `mock_token_${btoa(user.email)}_${Date.now()}`;
+      
+      // Store token in localStorage
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('user', JSON.stringify({
+        id: user.id,
+        email: user.email,
+        name: `${user.firstName} ${user.lastName}`,
+        role: user.role === 'maintenance' ? 'Maintenance Engineer' : 
+              user.role === 'operator' ? 'Machine Operator' : 'Administrator'
+      }));
+      
+      return { 
+        success: true, 
+        user: {
+          id: user.id,
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          role: user.role === 'maintenance' ? 'Maintenance Engineer' : 
+                user.role === 'operator' ? 'Machine Operator' : 'Administrator'
+        } 
+      };
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    return { 
+      success: false, 
+      error: error.response?.data?.message || error.message || 'Failed to login' 
+    };
+  }
+};
+
+export const signup = async (userData) => {
+  try {
+    // First try the actual API
+    try {
+      const response = await api.post('/auth/register', userData);
+      const { token, user } = response.data;
+      
+      // Store token in localStorage
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      return { success: true, user };
+    } catch (apiError) {
+      console.log('API signup failed, using mock registration');
+      
+      // Validate email doesn't already exist
+      if (userDb.some(u => u.email === userData.email)) {
+        throw new Error('Email already registered');
+      }
+      
+      // Create new user (for mock purposes)
+      const newUser = {
+        id: `${userDb.length + 1}`,
+        email: userData.email,
+        password: userData.password,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        role: userData.role || 'maintenance'
+      };
+      
+      // Add to mock DB (this would normally be done on the backend)
+      userDb.push(newUser);
+      
+      // Generate mock token
+      const token = `mock_token_${btoa(newUser.email)}_${Date.now()}`;
+      
+      // Store token in localStorage
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('user', JSON.stringify({
+        id: newUser.id,
+        email: newUser.email,
+        name: `${newUser.firstName} ${newUser.lastName}`,
+        role: newUser.role === 'maintenance' ? 'Maintenance Engineer' : 
+              newUser.role === 'operator' ? 'Machine Operator' : 'Administrator'
+      }));
+      
+      return { 
+        success: true, 
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          name: `${newUser.firstName} ${newUser.lastName}`,
+          role: newUser.role === 'maintenance' ? 'Maintenance Engineer' : 
+                newUser.role === 'operator' ? 'Machine Operator' : 'Administrator'
+        } 
+      };
+    }
+  } catch (error) {
+    console.error('Signup error:', error);
+    return { 
+      success: false, 
+      error: error.response?.data?.message || error.message || 'Failed to register' 
+    };
+  }
+};
+
+export const logout = () => {
+  // Remove token from localStorage
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user');
+};
+
+export const getCurrentUser = () => {
+  try {
+    const userJson = localStorage.getItem('user');
+    return userJson ? JSON.parse(userJson) : null;
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    return null;
+  }
+};
+
+export const checkAuth = () => {
+  return !!getToken();
+};
+
 // Mock data for machines
 const mockMachines = [
   {
@@ -942,6 +1116,14 @@ export const getMaintenanceRecommendations = async (equipmentId) => {
 
 // Assign the object to a variable before exporting
 const apiService = {
+  // Auth services
+  login,
+  signup,
+  logout,
+  getCurrentUser,
+  checkAuth,
+  
+  // Existing API services
   getMachines,
   getMachineDetails,
   getMachineHistory,

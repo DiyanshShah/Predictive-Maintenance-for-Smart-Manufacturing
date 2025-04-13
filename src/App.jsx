@@ -72,6 +72,9 @@ import {
   getModelSettings,
   saveModelSettings,
   trainModel,
+  getCurrentUser,
+  checkAuth,
+  logout
 } from './services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import DataUploader from './components/DataUploader';
@@ -94,6 +97,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 import SettingsIcon from '@mui/icons-material/Settings';
+import Settings from './components/Settings';
 
 // Create a theme
 const theme = createTheme({
@@ -202,6 +206,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authView, setAuthView] = useState('login'); // 'login' or 'signup'
   const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const [machines, setMachines] = useState([]);
   const [selectedMachine, setSelectedMachine] = useState(null);
@@ -251,6 +256,33 @@ function App() {
     animate: { opacity: 1, transition: { duration: 0.5 } },
     exit: { opacity: 0, transition: { duration: 0.3 } }
   };
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Check for existing authentication on app load
+  useEffect(() => {
+    const checkAuthentication = () => {
+      const isLoggedIn = checkAuth();
+      
+      if (isLoggedIn) {
+        const user = getCurrentUser();
+        if (user) {
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+        } else {
+          // Token exists but user data is missing, clear auth
+          logout();
+          setIsAuthenticated(false);
+        }
+      } else {
+        setIsAuthenticated(false);
+      }
+      
+      setAuthLoading(false);
+    };
+    
+    checkAuthentication();
+  }, []);
 
   // Fetch data from API
   useEffect(() => {
@@ -574,10 +606,46 @@ function App() {
 
   // Handle logout
   const handleLogout = () => {
+    // Call the logout API function
+    logout();
+    
+    // Reset state
     setIsAuthenticated(false);
     setCurrentUser(null);
     setAuthView('login');
   };
+
+  // Handle opening/closing settings dialog
+  const handleOpenSettings = () => {
+    setSettingsOpen(true);
+  };
+
+  const handleCloseSettings = () => {
+    setSettingsOpen(false);
+  };
+
+  // If auth is still loading, show a loading spinner
+  if (authLoading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '100vh',
+          flexDirection: 'column',
+          gap: 2
+        }}>
+          <PrecisionManufacturingIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+          <Typography variant="h6" color="primary">
+            Loading Predictify...
+          </Typography>
+          <CircularProgress />
+        </Box>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider theme={theme}>
@@ -672,21 +740,13 @@ function App() {
                 </Box>
                 
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Tooltip title="Notifications">
-                    <IconButton color="inherit" sx={{ mx: 1 }}>
-                      <Badge badgeContent={3} color="error">
-                        <NotificationsIcon />
-                      </Badge>
-                    </IconButton>
-                  </Tooltip>
-                  
                   <Tooltip title="Settings">
-                    <IconButton color="inherit" sx={{ mx: 1 }}>
+                    <IconButton color="inherit" sx={{ mx: 1 }} onClick={handleOpenSettings}>
                       <SettingsIcon />
                     </IconButton>
                   </Tooltip>
                   
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ duration: 0.1 }}>
                     <Button
                       color="inherit"
                       onClick={() => setCurrentView('profile')}
@@ -719,7 +779,7 @@ function App() {
                   
                   <Divider orientation="vertical" flexItem sx={{ mx: 2, backgroundColor: 'rgba(255,255,255,0.3)' }} />
                   
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ duration: 0.1 }}>
                     <Button 
                       variant="outlined"
                       color="inherit" 
@@ -1007,6 +1067,12 @@ function App() {
                 </motion.div>
               </AnimatePresence>
             </Container>
+            
+            {/* Settings Dialog */}
+            <Settings
+              open={settingsOpen}
+              onClose={handleCloseSettings}
+            />
           </>
         ) : (
           <Container maxWidth="sm" sx={{ mt: 8 }}>

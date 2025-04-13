@@ -7,15 +7,18 @@ import {
   Paper, 
   Container,
   Link,
-  Alert
+  Alert,
+  CircularProgress
 } from '@mui/material';
+import apiService from '../services/api';
 
-const Login = ({ onLogin, onSwitchToSignup }) => {
+const Login = ({ onLogin, onViewChange }) => {
   const [credentials, setCredentials] = useState({
     email: '',
     password: ''
   });
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setCredentials({
@@ -24,8 +27,11 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Reset any previous errors
+    setError(null);
     
     // Simple validation
     if (!credentials.email || !credentials.password) {
@@ -33,15 +39,25 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
       return;
     }
 
-    // In a real application, you would call the API to validate credentials
-    // For now, we'll just simulate a successful login
-    onLogin({ 
-      user: {
-        email: credentials.email,
-        name: credentials.email.split('@')[0],
-        role: 'Maintenance Engineer'
+    try {
+      setLoading(true);
+      
+      // Call the login API
+      const result = await apiService.login(credentials.email, credentials.password);
+      
+      if (result.success) {
+        // Success - call the onLogin callback with the user details
+        onLogin({ user: result.user });
+      } else {
+        // Failed login
+        setError(result.error || 'Login failed. Please check your credentials.');
       }
-    });
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -73,6 +89,8 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
               autoFocus
               value={credentials.email}
               onChange={handleChange}
+              disabled={loading}
+              error={!!error}
             />
             <TextField
               margin="normal"
@@ -85,6 +103,8 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
               autoComplete="current-password"
               value={credentials.password}
               onChange={handleChange}
+              disabled={loading}
+              error={!!error}
             />
             <Button
               type="submit"
@@ -92,18 +112,25 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
               variant="contained"
               color="primary"
               sx={{ mt: 3, mb: 2 }}
+              disabled={loading}
             >
-              Sign In
+              {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
             </Button>
             <Box sx={{ textAlign: 'center' }}>
               <Link 
                 component="button" 
                 variant="body2" 
-                onClick={onSwitchToSignup}
+                onClick={onViewChange}
                 sx={{ cursor: 'pointer' }}
+                disabled={loading}
               >
                 Don't have an account? Sign Up
               </Link>
+            </Box>
+            <Box sx={{ mt: 3, textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">
+                Demo credentials: admin@example.com / admin123
+              </Typography>
             </Box>
           </Box>
         </Paper>

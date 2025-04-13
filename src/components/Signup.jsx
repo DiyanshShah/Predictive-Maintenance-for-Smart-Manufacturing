@@ -12,10 +12,12 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  CircularProgress
 } from '@mui/material';
+import apiService from '../services/api';
 
-const Signup = ({ onSignup, onSwitchToLogin }) => {
+const Signup = ({ onSignup, onViewChange }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -25,6 +27,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
     role: 'maintenance'
   });
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -33,8 +36,11 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Reset error
+    setError(null);
     
     // Simple validation
     if (!formData.email || !formData.password || !formData.firstName || !formData.lastName) {
@@ -47,16 +53,46 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
       return;
     }
 
-    // In a real application, you would call the API to create a new user
-    // For now, we'll just simulate a successful signup
-    onSignup({ 
-      user: {
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (!isValidEmail(formData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Call the signup API
+      const result = await apiService.signup({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         email: formData.email,
-        name: `${formData.firstName} ${formData.lastName}`,
-        role: formData.role === 'maintenance' ? 'Maintenance Engineer' : 
-              formData.role === 'operator' ? 'Machine Operator' : 'Administrator'
+        password: formData.password,
+        role: formData.role
+      });
+      
+      if (result.success) {
+        // Success - call the onSignup callback with the user details
+        onSignup({ user: result.user });
+      } else {
+        // Failed signup
+        setError(result.error || 'Registration failed. Please try again.');
       }
-    });
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Simple email validation
+  const isValidEmail = (email) => {
+    return /\S+@\S+\.\S+/.test(email);
   };
 
   return (
@@ -89,6 +125,8 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                   autoFocus
                   value={formData.firstName}
                   onChange={handleChange}
+                  disabled={loading}
+                  error={!!error && !formData.firstName}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -101,6 +139,8 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                   autoComplete="family-name"
                   value={formData.lastName}
                   onChange={handleChange}
+                  disabled={loading}
+                  error={!!error && !formData.lastName}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -113,6 +153,8 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                   autoComplete="email"
                   value={formData.email}
                   onChange={handleChange}
+                  disabled={loading}
+                  error={!!error && (!formData.email || !isValidEmail(formData.email))}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -126,6 +168,9 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                   autoComplete="new-password"
                   value={formData.password}
                   onChange={handleChange}
+                  disabled={loading}
+                  error={!!error && (!formData.password || formData.password.length < 6)}
+                  helperText="Password must be at least 6 characters"
                 />
               </Grid>
               <Grid item xs={12}>
@@ -138,10 +183,12 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                   id="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
+                  disabled={loading}
+                  error={!!error && formData.password !== formData.confirmPassword}
                 />
               </Grid>
               <Grid item xs={12}>
-                <FormControl fullWidth>
+                <FormControl fullWidth disabled={loading}>
                   <InputLabel id="role-label">Role</InputLabel>
                   <Select
                     labelId="role-label"
@@ -153,7 +200,6 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
                   >
                     <MenuItem value="maintenance">Maintenance Engineer</MenuItem>
                     <MenuItem value="operator">Machine Operator</MenuItem>
-                    <MenuItem value="admin">Administrator</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -164,15 +210,17 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
               variant="contained"
               color="primary"
               sx={{ mt: 3, mb: 2 }}
+              disabled={loading}
             >
-              Sign Up
+              {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign Up'}
             </Button>
             <Box sx={{ textAlign: 'center' }}>
               <Link 
                 component="button" 
                 variant="body2" 
-                onClick={onSwitchToLogin}
+                onClick={onViewChange}
                 sx={{ cursor: 'pointer' }}
+                disabled={loading}
               >
                 Already have an account? Sign in
               </Link>
