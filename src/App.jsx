@@ -304,28 +304,34 @@ function App() {
           setSelectedMachine(firstMachine);
           
           // Fetch sensor data for the selected machine
-          const rawSensorData = await getMachineReadings(firstMachine.equipment_id);
+          const sensorResponse = await getMachineReadings(firstMachine.equipment_id);
           
-          // Format data for the chart
-          const formattedData = rawSensorData.map(reading => {
-            // Format timestamp for display
-            const date = new Date(reading.timestamp);
-            const formattedTime = date.toLocaleTimeString();
+          // Check if we have sensor data and it's in the expected format
+          if (sensorResponse && sensorResponse.readings && Array.isArray(sensorResponse.readings)) {
+            // Format data for the chart
+            const formattedData = sensorResponse.readings.map(reading => {
+              // Format timestamp for display
+              const date = new Date(reading.timestamp);
+              const formattedTime = date.toLocaleTimeString();
+              
+              // Make sure all needed properties exist
+              return {
+                ...reading,
+                name: formattedTime,
+                // Ensure all sensor types have at least a default value
+                temperature: reading.temperature || 0,
+                vibration: reading.vibration || 0,
+                pressure: reading.pressure || 0,
+                oil_level: reading.oil_level || 0
+              };
+            });
             
-            // Make sure all needed properties exist
-            return {
-              ...reading,
-              name: formattedTime,
-              // Ensure all sensor types have at least a default value
-              temperature: reading.temperature || 0,
-              vibration: reading.vibration || 0,
-              pressure: reading.pressure || 0,
-              oil_level: reading.oil_level || 0
-            };
-          });
-          
-          console.log("Initial sensor data:", formattedData);
-          setSensorData(formattedData);
+            console.log("Initial sensor data:", formattedData);
+            setSensorData(formattedData);
+          } else {
+            console.warn("Sensor data is not in expected format:", sensorResponse);
+            setSensorData([]);
+          }
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -359,12 +365,38 @@ function App() {
         setLoading(true);
         setError(null);
 
+        // Get the equipment_id string, ensuring we don't pass an object
+        const equipmentId = selectedMachine.equipment_id;
+        
         // Fetch machine details
-        const details = await getMachineDetails(selectedMachine);
+        const details = await getMachineDetails(equipmentId);
         
         // Fetch sensor data
-        const sensorData = await getMachineReadings(selectedMachine);
-        setSensorData(sensorData);
+        const sensorResponse = await getMachineReadings(equipmentId);
+        if (sensorResponse && sensorResponse.readings && Array.isArray(sensorResponse.readings)) {
+          // Format data for the chart
+          const formattedData = sensorResponse.readings.map(reading => {
+            // Format timestamp for display
+            const date = new Date(reading.timestamp);
+            const formattedTime = isNaN(date.getTime()) ? 'Invalid time' : date.toLocaleTimeString();
+            
+            // Make sure all needed properties exist
+            return {
+              ...reading,
+              name: formattedTime,
+              // Ensure all sensor types have at least a default value
+              temperature: typeof reading.temperature === 'number' ? reading.temperature : 0,
+              vibration: typeof reading.vibration === 'number' ? reading.vibration : 0,
+              pressure: typeof reading.pressure === 'number' ? reading.pressure : 0,
+              oil_level: typeof reading.oil_level === 'number' ? reading.oil_level : 0
+            };
+          });
+          
+          setSensorData(formattedData);
+        } else {
+          console.warn("Sensor data is not in expected format:", sensorResponse);
+          setSensorData([]);
+        }
 
       } catch (error) {
         console.error('Error fetching machine data:', error);
@@ -393,9 +425,10 @@ function App() {
     try {
       setPredictLoading(true);
       // Get latest sensor data for this machine
-      const latestReading = await getMachineReadings(selectedMachine.equipment_id, { limit: 1 });
+      const sensorResponse = await getMachineReadings(selectedMachine.equipment_id, { limit: 1 });
       
-      if (!latestReading || latestReading.length === 0) {
+      // Check if we have valid sensor data
+      if (!sensorResponse || !sensorResponse.readings || !Array.isArray(sensorResponse.readings) || sensorResponse.readings.length === 0) {
         setError({
           severity: 'error',
           message: 'No sensor data available for prediction'
@@ -405,7 +438,7 @@ function App() {
       }
       
       // Prepare prediction input with full sensor data
-      const reading = latestReading[0];
+      const reading = sensorResponse.readings[0];
       console.log("Using sensor reading for prediction:", reading);
       
       const predictionInput = {
@@ -509,80 +542,20 @@ function App() {
   };
 
   // Handle machine selection
-  const handleMachineSelect = async (machineId) => {
-    try {
-      setLoading(true);
-      
-      // Find the machine object from the machines array
-      const machine = machines.find(m => m.equipment_id === machineId);
-      
-      if (!machine) {
-        console.error(`Machine with ID ${machineId} not found in machines list`);
-        setError({
-          severity: 'error',
-          message: 'Selected machine not found'
-        });
-        setLoading(false);
-        return;
-      }
-      
-      console.log(`Selected machine: ${machine.name} (${machine.equipment_id})`);
-      
-      // Set the full machine object, not just the ID
-      setSelectedMachine(machine);
-      
-      // Fetch sensor data for the selected machine
-      console.log(`Fetching sensor data for ${machine.equipment_id}`);
-      const rawSensorData = await getMachineReadings(machineId);
-      console.log(`Received ${rawSensorData?.length || 0} sensor readings`);
-      
-      if (!rawSensorData || !Array.isArray(rawSensorData) || rawSensorData.length === 0) {
-        console.warn(`No sensor data available for ${machine.equipment_id}`);
-        setSensorData([]);
-        setLoading(false);
-        return;
-      }
-      
-      // Format data for the chart
-      const formattedData = rawSensorData.map(reading => {
-        // Format timestamp for display
-        let formattedTime = 'Unknown';
-        try {
-          const date = new Date(reading.timestamp);
-          formattedTime = isNaN(date.getTime()) ? 'Invalid time' : date.toLocaleTimeString();
-        } catch (err) {
-          console.error('Error formatting timestamp:', err);
-        }
-        
-        // Make sure all needed properties exist
-        return {
-          ...reading,
-          name: formattedTime,
-          // Ensure all sensor types have at least a default value
-          temperature: typeof reading.temperature === 'number' ? reading.temperature : 0,
-          vibration: typeof reading.vibration === 'number' ? reading.vibration : 0,
-          pressure: typeof reading.pressure === 'number' ? reading.pressure : 0,
-          oil_level: typeof reading.oil_level === 'number' ? reading.oil_level : 0
-        };
-      });
-      
-      console.log(`Formatted ${formattedData.length} sensor readings for display`);
-      console.log("Sensor data sample:", formattedData[0]);
-      setSensorData(formattedData);
-      
-      // Clear previous prediction results
-      setPredictionResult(null);
-      
-    } catch (error) {
-      console.error('Error fetching machine data:', error);
-      setError({
-        severity: 'error',
-        message: `Failed to load machine data: ${error.message || 'Unknown error'}`
-      });
+  const handleMachineSelect = (machine) => {
+    console.log('Machine selected:', machine);
+    if (!machine) {
+      setSelectedMachine(null);
       setSensorData([]);
-    } finally {
-      setLoading(false);
+      return;
     }
+    
+    // Make sure we extract the machine properly (it could be an object or just an ID)
+    const machineData = typeof machine === 'string' 
+      ? { equipment_id: machine } 
+      : machine;
+      
+    setSelectedMachine(machineData);
   };
 
   // Handle login/signup views

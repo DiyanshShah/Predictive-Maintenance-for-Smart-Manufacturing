@@ -331,16 +331,25 @@ const generateMockReadings = (equipmentId, count = 20) => {
 
 // Generate mock machine details
 const generateMockMachineDetails = (equipmentId) => {
+  // Ensure equipmentId is a string
+  const equipmentIdStr = equipmentId && typeof equipmentId === 'string' ? equipmentId : 
+                          (equipmentId && equipmentId.equipment_id) ? equipmentId.equipment_id :
+                          String(equipmentId || 'UNKNOWN');
+  
+  console.log('Processing equipmentId:', equipmentIdStr);
+  
   // First try exact match
-  let machine = mockMachines.find(m => m.equipment_id === equipmentId);
+  let machine = mockMachines.find(m => m.equipment_id === equipmentIdStr);
   
   // If not found, try case-insensitive match
   if (!machine) {
-    machine = mockMachines.find(m => m.equipment_id.toLowerCase() === equipmentId.toLowerCase());
+    machine = mockMachines.find(m => 
+      m.equipment_id.toLowerCase() === equipmentIdStr.toLowerCase()
+    );
   }
   
   // Special case for 'MACHINE_003' which might be requested but not in our mock data
-  if (!machine && equipmentId === 'MACHINE_003') {
+  if (!machine && equipmentIdStr === 'MACHINE_003') {
     // Use MOTOR003 data as a fallback
     machine = mockMachines.find(m => m.equipment_id === 'MOTOR003');
     // If found, clone it and update the ID
@@ -355,10 +364,10 @@ const generateMockMachineDetails = (equipmentId) => {
   
   // If still not found, generate a generic machine
   if (!machine) {
-    console.log(`Creating generic mock data for unknown equipment ID: ${equipmentId}`);
+    console.log(`Creating generic mock data for unknown equipment ID: ${equipmentIdStr}`);
     machine = {
-      equipment_id: equipmentId,
-      name: `Equipment ${equipmentId}`,
+      equipment_id: equipmentIdStr,
+      name: `Equipment ${equipmentIdStr}`,
       status: 'normal',
       last_maintenance_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       installation_date: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -371,7 +380,7 @@ const generateMockMachineDetails = (equipmentId) => {
   
   return {
     ...machine,
-    readings: generateMockReadings(equipmentId, 5),
+    readings: generateMockReadings(equipmentIdStr, 5),
     maintenance_history: [
       {
         id: "m-" + Math.floor(Math.random() * 1000),
@@ -450,7 +459,12 @@ export const getMachineReadings = async (equipmentId, params = {}) => {
   } catch (error) {
     console.error(`Error fetching readings for ${equipmentId}:`, error);
     // Return mock readings if API fails
-    return generateMockReadings(equipmentId, 30);
+    const mockReadings = generateMockReadings(equipmentId, 30);
+    // Ensure we return in the same format as the API would
+    return {
+      equipment_id: equipmentId,
+      readings: mockReadings
+    };
   }
 };
 
@@ -461,7 +475,7 @@ export const runPrediction = async (data) => {
   try {
     console.log("Sending prediction request with data:", data);
     // Ensure we include all available sensor readings for better prediction
-    const response = await api.post('/predict', data);
+    const response = await api.post('/prediction', data);
     console.log("Raw prediction response:", response.data);
     
     // Map the backend response fields to frontend expected fields while preserving all ML model data
@@ -471,12 +485,12 @@ export const runPrediction = async (data) => {
       timestamp: resultData.timestamp || new Date().toISOString(),
       equipment_id: resultData.equipment_id || data.equipment_id || 'unknown',
       // Map backend fields to expected frontend fields
-      failure_probability: resultData.probability,
-      remaining_useful_life: resultData.estimated_time_to_failure,
-      confidence: resultData.confidence || 0.9,
+      failure_probability: resultData.prediction?.failure_probability,
+      remaining_useful_life: resultData.prediction?.remaining_useful_life_days,
+      confidence: resultData.prediction?.confidence || 0.9,
       anomaly_detected: resultData.anomaly_detected,
       anomaly_score: resultData.anomaly_score,
-      recommended_action: resultData.prediction, // prediction field maps to recommended_action
+      recommended_action: resultData.prediction?.recommended_action, // prediction field maps to recommended_action
       affected_components: resultData.affected_components || [],
       next_maintenance_date: resultData.next_maintenance_date,
       maintenance_required: resultData.maintenance_required,

@@ -12,6 +12,9 @@ from datetime import datetime, timedelta
 import random
 import uuid
 from pathlib import Path
+import jwt
+from passlib.context import CryptContext
+import bcrypt
 
 # Create directories for data and models
 os.makedirs("./data", exist_ok=True)
@@ -179,6 +182,71 @@ def load_sample_data():
 
 # Load sample data on startup
 load_sample_data()
+
+# JWT Settings
+SECRET_KEY = "YOUR_SECRET_KEY_CHANGE_THIS_IN_PRODUCTION"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
+
+# User models
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    firstName: str
+    lastName: str
+    role: str = "maintenance"
+
+# Mock users database
+users_db = [
+    {
+        "id": "1",
+        "email": "admin@example.com",
+        "password_hash": bcrypt.hashpw("admin123".encode(), bcrypt.gensalt()).decode(),
+        "firstName": "Admin",
+        "lastName": "User",
+        "role": "admin"
+    },
+    {
+        "id": "2",
+        "email": "engineer@example.com",
+        "password_hash": bcrypt.hashpw("engineer123".encode(), bcrypt.gensalt()).decode(),
+        "firstName": "Maintenance",
+        "lastName": "Engineer",
+        "role": "maintenance"
+    }
+]
+
+# Helper functions for authentication
+def verify_password(plain_password, hashed_password):
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+
+def get_user(email):
+    for user in users_db:
+        if user["email"] == email:
+            return user
+    return None
+
+def authenticate_user(email, password):
+    user = get_user(email)
+    if not user:
+        return False
+    if not verify_password(password, user["password_hash"]):
+        return False
+    return user
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now() + expires_delta
+    else:
+        expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 # Endpoints
 @app.get("/")
@@ -627,3 +695,109 @@ def get_feature_importance():
     ]
 
 # Run with: uvicorn main:app --reload --port 8000 
+
+# Authentication endpoints
+@app.post("/api/auth/login")
+def login(user_data: UserLogin):
+    user = authenticate_user(user_data.email, user_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["email"]}, expires_delta=access_token_expires
+    )
+    
+    return {
+        "token": access_token,
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "name": f"{user['firstName']} {user['lastName']}",
+            "role": user["role"]
+        }
+    }
+
+@app.post("/api/auth/register")
+def register(user_data: UserCreate):
+    # Check if user already exists
+    existing_user = get_user(user_data.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+    
+    # Create new user
+    new_user = {
+        "id": str(len(users_db) + 1),
+        "email": user_data.email,
+        "password_hash": bcrypt.hashpw(user_data.password.encode(), bcrypt.gensalt()).decode(),
+        "firstName": user_data.firstName,
+        "lastName": user_data.lastName,
+        "role": user_data.role
+    }
+    
+    # Add to users database
+    users_db.append(new_user)
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": new_user["email"]}, expires_delta=access_token_expires
+    )
+    
+    return {
+        "token": access_token,
+        "user": {
+            "id": new_user["id"],
+            "email": new_user["email"],
+            "name": f"{new_user['firstName']} {new_user['lastName']}",
+            "role": new_user["role"]
+        }
+    }
+
+# Add equipment alias routes for frontend compatibility
+@app.get("/api/equipment")
+def get_equipment_list():
+    """Alias for get_machines to maintain frontend compatibility"""
+    return list(equipment_db.values())
+
+@app.get("/api/equipment/{equipment_id}")
+def get_equipment_details(equipment_id: str):
+    """Alias for get_machine_details to maintain frontend compatibility"""
+    if equipment_id not in equipment_db:
+        raise HTTPException(status_code=404, detail="Equipment not found")
+    return equipment_db[equipment_id]
+
+@app.get("/api/equipment/{equipment_id}/readings")
+def get_equipment_readings(
+    equipment_id: str, 
+    start_date: Optional[str] = None, 
+    end_date: Optional[str] = None,
+    limit: int = Query(100, le=1000)
+):
+    """Alias for get_machine_readings to maintain frontend compatibility"""
+    if equipment_id not in equipment_db:
+        raise HTTPException(status_code=404, detail="Equipment not found")
+    
+    readings = sensor_readings.get(equipment_id, [])
+    
+    # Filter by dates if provided
+    if start_date:
+        readings = [r for r in readings if r["timestamp"] >= start_date]
+    if end_date:
+        readings = [r for r in readings if r["timestamp"] <= end_date]
+    
+    # Apply limit
+    readings = readings[:limit]
+    
+    return {
+        "equipment_id": equipment_id,
+        "readings": readings
+    } 

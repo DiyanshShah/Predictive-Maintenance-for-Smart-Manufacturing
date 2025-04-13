@@ -27,6 +27,12 @@ import {
   Stack,
   Tooltip,
   alpha,
+  Collapse,
+  List,
+  ListItem,
+  ListItemText,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -37,7 +43,10 @@ import {
   Delete as DeleteIcon,
   Storage as StorageIcon,
   Cable as CableIcon,
-  Api as ApiIcon
+  Api as ApiIcon,
+  ExpandMore as ExpandMoreIcon,
+  Info as InfoIcon,
+  ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import {
   setupConnector,
@@ -45,6 +54,7 @@ import {
   listConnectors,
   getMachines
 } from '../services/api';
+import { motion } from 'framer-motion';
 
 const ConnectorManager = () => {
   const [connectors, setConnectors] = useState([]);
@@ -53,6 +63,12 @@ const ConnectorManager = () => {
   const [error, setError] = useState(null);
   const [machines, setMachines] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
+  const [selectedConnector, setSelectedConnector] = useState(null);
+  const [detailsDialog, setDetailsDialog] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+
   const [formValues, setFormValues] = useState({
     connector_type: 'csv',
     equipment_id: '',
@@ -225,6 +241,11 @@ const ConnectorManager = () => {
       // Refresh connectors list
       const updatedConnectors = await listConnectors();
       setConnectors(updatedConnectors);
+      
+      // Close details dialog if it was open for this connector
+      if (selectedConnector?.equipment_id === equipmentId) {
+        setDetailsDialog(false);
+      }
     } catch (error) {
       setError('Failed to stop connector: ' + error.message);
     } finally {
@@ -252,6 +273,26 @@ const ConnectorManager = () => {
       case 'OPCUAConnector': return <CloudSyncIcon />;
       default: return <StorageIcon />;
     }
+  };
+  
+  // Open connector details dialog
+  const handleOpenDetails = (connector) => {
+    setSelectedConnector(connector);
+    setDetailsDialog(true);
+  };
+  
+  // Close connector details dialog
+  const handleCloseDetails = () => {
+    setDetailsDialog(false);
+  };
+  
+  // Calculate card sizes based on number of connectors
+  const getCardSize = () => {
+    if (isMobile) return 12; // Full width on mobile
+    if (connectors.length <= 2 || isTablet) return 6; // Half width for 1-2 connectors or on tablet
+    if (connectors.length <= 6) return 4; // Third width for 3-6 connectors
+    if (connectors.length <= 12) return 3; // Quarter width for 7-12 connectors
+    return 2; // Small cards for many connectors
   };
 
   return (
@@ -329,23 +370,36 @@ const ConnectorManager = () => {
             <Grid container spacing={2}>
               {connectors.map((connector) => {
                 const machineName = machines.find(m => m.equipment_id === connector.equipment_id)?.name || connector.equipment_id;
+                const cardSize = getCardSize();
                 
                 return (
-                  <Grid item xs={12} sm={6} md={4} key={connector.equipment_id}>
+                  <Grid item xs={12} sm={cardSize <= 6 ? cardSize : 6} md={cardSize} 
+                        key={connector.equipment_id}
+                        component={motion.div}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                  >
                     <Card 
                       elevation={0} 
+                      onClick={() => handleOpenDetails(connector)}
                       sx={{ 
                         borderRadius: 2,
                         transition: 'all 0.2s',
                         border: '1px solid',
                         borderColor: 'divider',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        cursor: 'pointer',
                         '&:hover': {
                           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                          transform: 'translateY(-2px)'
+                          transform: 'translateY(-2px)',
+                          borderColor: 'primary.main',
                         }
                       }}
                     >
-                      <CardContent>
+                      <CardContent sx={{ flexGrow: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                           <Box 
                             sx={{ 
@@ -357,17 +411,17 @@ const ConnectorManager = () => {
                           >
                             {getConnectorIcon(connector.connector_type)}
                           </Box>
-                          <Box sx={{ flexGrow: 1 }}>
+                          <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
                             <Typography variant="subtitle1" fontWeight="500" noWrap>
                               {machineName}
                             </Typography>
                             <Typography variant="body2" color="text.secondary" noWrap>
-                              ID: {connector.equipment_id}
+                              {cardSize <= 4 ? connector.equipment_id.slice(0, 12) + '...' : connector.equipment_id}
                             </Typography>
                           </Box>
                         </Box>
                         
-                        <Stack direction="row" spacing={1} mt={2}>
+                        <Stack direction="row" spacing={1} mt={2} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
                           <Chip 
                             label={getConnectorTypeName(connector.connector_type)} 
                             size="small" 
@@ -386,16 +440,30 @@ const ConnectorManager = () => {
                         </Stack>
                       </CardContent>
                       
-                      <CardActions sx={{ justifyContent: 'flex-end', p: 2, pt: 0 }}>
+                      <CardActions sx={{ justifyContent: 'space-between', p: 2, pt: 0 }}>
+                        <Button
+                          size="small"
+                          startIcon={<InfoIcon />}
+                          sx={{ borderRadius: 1.5, textTransform: 'none' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDetails(connector);
+                          }}
+                        >
+                          Details
+                        </Button>
                         <Button 
                           variant="outlined" 
                           color="error" 
                           size="small"
                           startIcon={<StopIcon />}
-                          onClick={() => handleStopConnector(connector.equipment_id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStopConnector(connector.equipment_id);
+                          }}
                           sx={{ borderRadius: 1.5, textTransform: 'none' }}
                         >
-                          Stop Connector
+                          Stop
                         </Button>
                       </CardActions>
                     </Card>
@@ -560,6 +628,191 @@ const ConnectorManager = () => {
             {loading ? <CircularProgress size={24} /> : 'Set Up Connector'}
           </Button>
         </DialogActions>
+      </Dialog>
+      
+      {/* Connector Details Dialog */}
+      <Dialog
+        open={detailsDialog}
+        onClose={handleCloseDetails}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ 
+          sx: { 
+            borderRadius: 3,
+            overflow: 'hidden'
+          } 
+        }}
+      >
+        {selectedConnector && (
+          <>
+            <DialogTitle sx={{ 
+              bgcolor: 'background.default', 
+              px: 3, 
+              py: 2.5,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center'
+            }}>
+              <IconButton 
+                edge="start" 
+                onClick={handleCloseDetails}
+                sx={{ mr: 2 }}
+              >
+                <ArrowBackIcon />
+              </IconButton>
+              Connector Details
+            </DialogTitle>
+            <DialogContent sx={{ p: 3 }}>
+              <Box sx={{ pt: 1 }}>
+                <Typography variant="h6" gutterBottom>
+                  {machines.find(m => m.equipment_id === selectedConnector.equipment_id)?.name || selectedConnector.equipment_id}
+                </Typography>
+                
+                <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
+                  <Chip 
+                    label={getConnectorTypeName(selectedConnector.connector_type)} 
+                    size="small" 
+                    color="primary" 
+                    variant="outlined"
+                  />
+                  <Chip 
+                    label={selectedConnector.status} 
+                    size="small" 
+                    color="primary"
+                    sx={{
+                      fontWeight: 'medium',
+                      '& .MuiChip-label': { textTransform: 'capitalize' }
+                    }}
+                  />
+                </Stack>
+                
+                <List sx={{ 
+                  bgcolor: 'background.default', 
+                  borderRadius: 2,
+                  mb: 2
+                }}>
+                  <ListItem divider>
+                    <ListItemText 
+                      primary="Equipment ID" 
+                      secondary={selectedConnector.equipment_id}
+                      primaryTypographyProps={{ 
+                        color: 'text.secondary',
+                        fontSize: '0.875rem',
+                        fontWeight: 'medium'
+                      }}
+                      secondaryTypographyProps={{ 
+                        color: 'text.primary',
+                        fontWeight: 'medium'
+                      }}
+                    />
+                  </ListItem>
+                  <ListItem divider>
+                    <ListItemText 
+                      primary="Connector Type" 
+                      secondary={getConnectorTypeName(selectedConnector.connector_type)}
+                      primaryTypographyProps={{ 
+                        color: 'text.secondary',
+                        fontSize: '0.875rem',
+                        fontWeight: 'medium'
+                      }}
+                      secondaryTypographyProps={{ 
+                        color: 'text.primary',
+                        fontWeight: 'medium'
+                      }}
+                    />
+                  </ListItem>
+                  <ListItem divider>
+                    <ListItemText 
+                      primary="Status" 
+                      secondary={selectedConnector.status}
+                      primaryTypographyProps={{ 
+                        color: 'text.secondary',
+                        fontSize: '0.875rem',
+                        fontWeight: 'medium'
+                      }}
+                      secondaryTypographyProps={{ 
+                        color: 'text.primary',
+                        fontWeight: 'medium',
+                        textTransform: 'capitalize'
+                      }}
+                    />
+                  </ListItem>
+                  
+                  {selectedConnector.connection_params && Object.entries(selectedConnector.connection_params).map(([key, value]) => (
+                    <ListItem key={key} divider>
+                      <ListItemText 
+                        primary={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        secondary={String(value)}
+                        primaryTypographyProps={{ 
+                          color: 'text.secondary',
+                          fontSize: '0.875rem',
+                          fontWeight: 'medium'
+                        }}
+                        secondaryTypographyProps={{ 
+                          color: 'text.primary',
+                          fontWeight: 'medium',
+                          sx: { wordBreak: 'break-all' }
+                        }}
+                      />
+                    </ListItem>
+                  ))}
+                  
+                  {selectedConnector.config && Object.entries(selectedConnector.config).map(([key, value]) => (
+                    <ListItem key={key} divider={key !== Object.keys(selectedConnector.config).pop()}>
+                      <ListItemText 
+                        primary={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        secondary={typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        primaryTypographyProps={{ 
+                          color: 'text.secondary',
+                          fontSize: '0.875rem',
+                          fontWeight: 'medium'
+                        }}
+                        secondaryTypographyProps={{ 
+                          color: 'text.primary',
+                          fontWeight: 'medium',
+                          sx: { wordBreak: 'break-all' }
+                        }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ 
+              px: 3, 
+              py: 2.5, 
+              borderTop: '1px solid',
+              borderColor: 'divider',
+              justifyContent: 'space-between'
+            }}>
+              <Button 
+                color="error"
+                onClick={() => handleStopConnector(selectedConnector.equipment_id)}
+                startIcon={<StopIcon />}
+                variant="contained"
+                sx={{ 
+                  borderRadius: 1.5, 
+                  textTransform: 'none',
+                  fontWeight: 500
+                }}
+              >
+                Stop Connector
+              </Button>
+              <Button 
+                onClick={handleCloseDetails}
+                sx={{ 
+                  borderRadius: 1.5, 
+                  textTransform: 'none',
+                  fontWeight: 500
+                }}
+              >
+                Close
+              </Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </Paper>
   );

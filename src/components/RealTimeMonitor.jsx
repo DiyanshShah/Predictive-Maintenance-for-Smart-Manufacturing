@@ -49,14 +49,33 @@ const RealTimeMonitor = () => {
         limit: 20, // Last 20 readings
       };
       
-      const readings = await getMachineReadings(selectedMachine.equipment_id, params);
-      console.log("Fetched sensor readings:", readings);
-      setSensorData(readings);
+      const response = await getMachineReadings(selectedMachine.equipment_id, params);
+      console.log("Fetched sensor readings:", response);
+      
+      // Ensure we access the readings array from the response
+      if (response && typeof response === 'object') {
+        const readings = response.readings || [];
+        if (Array.isArray(readings)) {
+          setSensorData(readings);
+        } else {
+          console.warn("API returned non-array readings:", readings);
+          setSensorData([]);
+        }
+      } else {
+        console.warn("Invalid API response format:", response);
+        setSensorData([]);
+      }
+      
       setLastUpdated(new Date());
       
-      // Run prediction with the most recent reading
-      if (readings && readings.length > 0) {
-        const latestReading = readings[0];
+      // Check if we have valid sensor data to run prediction
+      const validReadings = sensorData.length > 0 ? sensorData : (
+        response && response.readings && Array.isArray(response.readings) && response.readings.length > 0
+          ? response.readings : []
+      );
+      
+      if (validReadings.length > 0) {
+        const latestReading = validReadings[0];
         const predictionInput = {
           timestamp: latestReading.timestamp,
           equipment_id: selectedMachine.equipment_id,
@@ -85,6 +104,7 @@ const RealTimeMonitor = () => {
     } catch (err) {
       console.error("Error in fetchSensorData:", err);
       setError('Failed to fetch sensor data: ' + (err.message || 'Unknown error'));
+      setSensorData([]);
     } finally {
       setLoading(false);
     }
@@ -92,7 +112,7 @@ const RealTimeMonitor = () => {
 
   // Run a prediction manually
   const handleRunPrediction = async () => {
-    if (!selectedMachine || !sensorData || sensorData.length === 0) {
+    if (!selectedMachine || !Array.isArray(sensorData) || sensorData.length === 0) {
       setError('Cannot run prediction: No machine selected or no sensor data available');
       return;
     }
@@ -104,10 +124,10 @@ const RealTimeMonitor = () => {
         timestamp: latestReading.timestamp,
         equipment_id: selectedMachine.equipment_id,
         readings: {
-          temperature: latestReading.temperature,
-          vibration: latestReading.vibration,
-          pressure: latestReading.pressure,
-          oil_level: latestReading.oil_level
+          temperature: typeof latestReading.temperature === 'number' ? latestReading.temperature : 0,
+          vibration: typeof latestReading.vibration === 'number' ? latestReading.vibration : 0,
+          pressure: typeof latestReading.pressure === 'number' ? latestReading.pressure : 0,
+          oil_level: typeof latestReading.oil_level === 'number' ? latestReading.oil_level : 0
         }
       };
       
@@ -192,7 +212,9 @@ const RealTimeMonitor = () => {
   };
 
   // Format sensor data for chart with safety checks
-  const chartData = sensorData.map(reading => {
+  const chartData = Array.isArray(sensorData) ? sensorData.map(reading => {
+    if (!reading) return null;
+    
     let timestamp;
     try {
       const date = new Date(reading.timestamp);
@@ -203,12 +225,12 @@ const RealTimeMonitor = () => {
     
     return {
       timestamp,
-      temperature: reading.temperature,
-      vibration: reading.vibration,
-      pressure: reading.pressure,
-      oil_level: reading.oil_level
+      temperature: typeof reading.temperature === 'number' ? reading.temperature : 0,
+      vibration: typeof reading.vibration === 'number' ? reading.vibration : 0,
+      pressure: typeof reading.pressure === 'number' ? reading.pressure : 0,
+      oil_level: typeof reading.oil_level === 'number' ? reading.oil_level : 0
     };
-  }).reverse();
+  }).filter(Boolean).reverse() : [];
 
   // Helper function to safely access prediction values
   const getPredictionValue = (path, defaultValue = 0) => {
@@ -362,11 +384,10 @@ const RealTimeMonitor = () => {
                       <Box sx={{ display: 'flex', gap: 2 }}>
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                           <Button
-                            size="small"
-                            variant="contained"
+                            variant="contained" 
                             color="primary"
                             onClick={handleRunPrediction}
-                            disabled={loading || !sensorData || sensorData.length === 0}
+                            disabled={loading || !Array.isArray(sensorData) || sensorData.length === 0}
                           >
                             Run Prediction
                           </Button>
