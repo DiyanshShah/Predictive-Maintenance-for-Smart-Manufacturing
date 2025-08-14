@@ -4,14 +4,14 @@ import random
 from datetime import datetime
 
 # API endpoint
-API_URL = "http://localhost:8000/api/predict"
+API_URL = "http://localhost:8000/api/prediction"
 
 def test_prediction_api():
     """Test the prediction API with sample data"""
     print("Testing prediction API...")
     
     # Create sample data for different equipment IDs
-    equipment_ids = ["PUMP001", "HVAC002", "MOTOR003", "TURBINE004", "COMPRESSOR005"]
+    equipment_ids = ["EQ001", "EQ002", "EQ003"]
     
     for equipment_id in equipment_ids:
         # Generate random sensor readings with some variance
@@ -28,7 +28,6 @@ def test_prediction_api():
         
         # Create the payload
         payload = {
-            "timestamp": datetime.now().isoformat(),
             "equipment_id": equipment_id,
             "readings": {
                 "temperature": temperature,
