@@ -15,6 +15,10 @@ from pathlib import Path
 import jwt
 from passlib.context import CryptContext
 import bcrypt
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Create directories for data and models
 os.makedirs("./data", exist_ok=True)
@@ -184,7 +188,7 @@ def load_sample_data():
 load_sample_data()
 
 # JWT Settings
-SECRET_KEY = "YOUR_SECRET_KEY_CHANGE_THIS_IN_PRODUCTION"
+SECRET_KEY = os.getenv("SECRET_KEY", "a_sEcReT_kEy_yOu_sHoUlD_cHaNgE")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
 

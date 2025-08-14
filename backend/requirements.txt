@@ -1,27 +1,31 @@
-fastapi==0.103.1
-uvicorn==0.23.2
-pydantic==2.3.0
-numpy==1.25.2
-pandas==2.1.0
-scikit-learn==1.3.0
-joblib==1.3.2
-python-multipart==0.0.6
-matplotlib==3.8.0
-seaborn==0.13.0
-plotly==5.17.0
-python-dotenv==1.0.0
-pytest==7.4.2
-tensorflow==2.15.0
-keras==2.15.0
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-pymysql==1.1.0
-alembic==1.12.1
-aiofiles==23.2.1
-requests==2.31.0
-pymodbus==3.5.2
+# Web framework
+fastapi==0.116.1
+uvicorn==0.35.0
+pydantic==2.11.7
+python-multipart==0.0.6 # For file uploads
+
+# Data processing and ML
+numpy==2.3.2
+pandas==2.3.1
+scikit-learn==1.7.1
+tensorflow==2.20.0
+joblib==1.5.1
+
+# Authentication
+passlib==1.7.4
+bcrypt==4.0.1
+PyJWT==2.10.1 # For handling JSON Web Tokens
+
+# Database
+SQLAlchemy==2.0.43
+psycopg2-binary==2.9.9 # For PostgreSQL
+pymysql==1.1.0 # For MySQL
+alembic==1.12.1 # For database migrations
+
+# Connectors
+requests==2.32.4
+pymodbus==3.11.1
 opcua==0.98.13
-# pyopc==0.1.0
-modbus-tk==1.1.2
-kafka-python==2.0.2
-# paho-mqtt==2.2.1 
+
+# Utilities
+python-dotenv==1.0.0 # For environment variables
